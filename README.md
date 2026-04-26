@@ -178,4 +178,4 @@ FirstCall is designed to complement emergency services, not replace them. Every 
 
 ## License
 
-Copyright (c) 2026 Harish Sundaralingam. All rights reserved.
+MIT License — see [LICENSE](LICENSE) for details.
