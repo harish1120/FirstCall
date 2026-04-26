@@ -1,0 +1,102 @@
+cardiac_arrest:
+  keywords: [cardiac arrest, not breathing, heart attack, unresponsive, unconscious]
+  steps:
+    - Call 911 immediately if not already done.
+    - Lay the person flat on their back on a firm surface.
+    - Place the heel of your hand on the centre of their chest.
+    - Push down hard and fast — 2 inches deep, 100 to 120 times per minute.
+    - If trained, give 2 rescue breaths after every 30 compressions.
+    - Do not stop until emergency services arrive or the person starts breathing.
+
+choking:
+  keywords: [choking, can't breathe, something stuck, turning blue]
+  steps:
+    - Ask the person if they can speak or cough — if yes, encourage them to keep coughing.
+    - If they cannot cough or speak, stand behind them and give 5 firm back blows between the shoulder blades.
+    - Follow with 5 abdominal thrusts — hands just above the navel, pull sharply inward and upward.
+    - Alternate back blows and abdominal thrusts until the object is dislodged or they lose consciousness.
+    - If they lose consciousness, begin CPR and call 911.
+
+severe_bleeding:
+  keywords: [bleeding, blood, wound, cut, laceration, won't stop bleeding]
+  steps:
+    - Apply firm, continuous pressure directly to the wound with a clean cloth or clothing.
+    - Do not lift the cloth — add more on top if it soaks through.
+    - If the wound is on a limb and bleeding is severe, consider a tourniquet 2 inches above the wound.
+    - Keep the person lying down and elevate the injured area above heart level if possible.
+    - Do not remove any embedded objects.
+    - Maintain pressure until emergency services arrive.
+
+stroke:
+  keywords: [stroke, face drooping, arm weak, speech slurred, FAST]
+  steps:
+    - Remember FAST — Face drooping, Arm weakness, Speech slurred, Time to call 911.
+    - Call 911 immediately — time is critical for stroke treatment.
+    - Keep the person calm and still. Do not give food or water.
+    - Note the exact time symptoms started — tell the paramedics.
+    - If unconscious and not breathing, begin CPR.
+
+burns:
+  keywords: [burn, burned, fire, hot, scalded, scald]
+  steps:
+    - Remove the person from the heat source safely.
+    - Cool the burn under cool (not cold) running water for at least 10 minutes.
+    - Do not use ice, butter, or toothpaste.
+    - Remove jewellery or clothing near the burn unless stuck to the skin.
+    - Cover loosely with a clean non-fluffy material such as cling film or a clean plastic bag.
+    - For large or deep burns, call 911.
+
+anaphylaxis:
+  keywords: [anaphylaxis, allergic reaction, throat closing, epipen, bee sting, swelling]
+  steps:
+    - Use the epinephrine auto-injector (EpiPen) immediately if available — outer thigh, through clothing is fine.
+    - Call 911 immediately.
+    - Have the person lie down with legs elevated unless breathing is difficult — if so, let them sit up.
+    - A second EpiPen dose can be given after 5 minutes if no improvement.
+    - Be prepared to perform CPR if the person becomes unresponsive.
+
+seizure:
+  keywords: [seizure, convulsing, fitting, shaking, epilepsy]
+  steps:
+    - Keep calm. Time the seizure.
+    - Clear the area of hard or sharp objects. Do not restrain the person.
+    - Place something soft under their head.
+    - Do not put anything in their mouth.
+    - After convulsions stop, roll them onto their side (recovery position).
+    - Call 911 if the seizure lasts more than 5 minutes, they do not regain consciousness, or they are injured.
+
+fracture:
+  keywords: [broken bone, fracture, broken arm, broken leg, snapped, cracked bone]
+  steps:
+    - Do not try to straighten the limb.
+    - Immobilise the injured area using a makeshift splint — rigid object and bandage or clothing.
+    - Apply ice wrapped in cloth to reduce swelling — do not apply directly to skin.
+    - Elevate the injured limb if possible.
+    - For open fractures (bone through skin), cover with a clean cloth. Do not push bone back in.
+    - Get to an emergency room or call 911 for transport.
+
+head_injury:
+  keywords: [head injury, hit head, concussion, fell and hit, head trauma]
+  steps:
+    - Keep the person still and calm. Do not move them if a neck injury is possible.
+    - If unconscious, check for breathing and call 911.
+    - Apply gentle pressure to any bleeding wound with a clean cloth.
+    - Watch for warning signs — unequal pupils, repeated vomiting, confusion, or loss of consciousness.
+    - Do not give food, drink, or medication.
+    - Get medical evaluation even if they seem fine — symptoms can be delayed.
+
+poisoning:
+  keywords: [poisoning, overdose, swallowed, ingested, took too many, pills, toxic]
+  steps:
+    - Call 911 or Poison Control immediately.
+    - Do not induce vomiting unless instructed by emergency services.
+    - If the person is conscious, keep them calm and still.
+    - If unconscious, place in recovery position and monitor breathing.
+    - Collect the substance container or note the substance name to tell paramedics.
+
+default:
+  steps:
+    - Keep the person calm and still.
+    - Do not move them unless they are in immediate danger.
+    - Monitor their breathing and consciousness.
+    - Call 911 if their condition worsens or you are unsure.
