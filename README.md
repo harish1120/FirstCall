@@ -8,7 +8,7 @@
 ![Deepgram](https://img.shields.io/badge/Deepgram-STT-101010?style=for-the-badge&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
-![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **AI-powered voice agent for medical emergency triage and first aid guidance.**
 
