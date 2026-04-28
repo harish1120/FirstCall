@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Request, status, Depends
-from fastapi.responses import Response
+import asyncio
+import base64
+import json
+from fastapi import FastAPI, Request, WebSocket, status, Depends
+from fastapi.responses import Response, StreamingResponse
 from app.agent import build_response, get_session_meta
 from app.database import Base, engine, get_db
 from app import models
-from fastapi.responses import StreamingResponse
-from app.tts import text_to_speech_stream
+from app.tts import text_to_speech_stream, intro_speech
+from app.stt import transcribe_stream
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,13 +24,16 @@ async def health():
 @app.post("/voice")
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
-    twiml = """<?xml version="1.0" encoding="UTF-8"?>
+    form = await request.form()
+    country = form.get("FromCountry", "US")
+    twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Say voice="Polly.Joanna">
-            Hello, this is FirstCall. Please describe the emergency!.
-        </Say>
-        <Gather input="speech" action="https://caterer-divorcee-unloving.ngrok-free.dev/handle-speech" speechTimeout="auto">
-        </Gather>
+        <Play>https://caterer-divorcee-unloving.ngrok-free.dev/play-intro</Play>
+        <Connect>
+            <Stream url="wss://caterer-divorcee-unloving.ngrok-free.dev/stream">
+                <Parameter name="country" value="{country}"/>
+            </Stream>
+        </Connect>
     </Response>"""
     return Response(content=twiml, media_type="application/xml")
 
@@ -59,6 +65,14 @@ async def handle_speech(request: Request):
     </Response>
     """
     return Response(content=twiml, media_type="application/xml")
+
+
+@app.get("/play-intro")
+async def play_intro():
+    text = "Hello, this is FirstCall. Please describe the emergency!"
+    if not text:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return StreamingResponse(intro_speech(text), media_type="audio/mpeg")
 
 
 @app.get("/audio/{call_sid}")
@@ -101,3 +115,38 @@ async def call_status(request: Request, db=Depends(get_db)):
     db.commit()
 
     return {"status": "logged"}
+
+
+@app.websocket("/stream")
+async def stream(websocket: WebSocket):
+    await websocket.accept()
+
+    audio_queue = asyncio.Queue()
+    call_sid = None
+
+    async def on_transcript(text):
+        print(f"{country_code}")
+        response = await asyncio.to_thread(build_response, text, call_sid, country_code)
+        for chunk in text_to_speech_stream(response):
+            await websocket.send_text(json.dumps({
+                "event": "media",
+                "streamSid": stream_sid,
+                "media": {"payload": base64.b64encode(chunk).decode("utf-8")}
+            }))
+
+    asyncio.create_task(transcribe_stream(audio_queue, on_transcript))
+
+    async for message in websocket.iter_text():
+        data = json.loads(message)
+
+        if data["event"] == "start":
+            call_sid = data["start"]["callSid"]
+            stream_sid = data["start"]["streamSid"]
+            country_code = data["start"]["customParameters"].get(
+                "country", "US")
+        elif data["event"] == "media":
+            audio = base64.b64decode(data["media"]["payload"])
+            await audio_queue.put(audio)
+        elif data["event"] == "stop":
+            await audio_queue.put(None)
+            break

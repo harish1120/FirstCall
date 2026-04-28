@@ -16,7 +16,8 @@ CRITICAL_KEYWORDS = [
 
 URGENT_KEYWORDS = [
     "broken bone", "fracture", "deep cut", "laceration", "moderate burn",
-    "head injury", "fell", "high fever", "chest pain",
+    "head injury", "fell", "high fever", "chest pain", "hit by", "car accident", "accident", "fell",
+    "knocked out", "unconscious", "trauma",
 ]
 
 
