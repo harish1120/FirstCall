@@ -17,6 +17,7 @@ dependencies = [
     "websockets>=16.0",
     "deepgram-sdk>=7.0.0",
     "boto3>=1.42.97",
+    "psycopg2-binary>=2.9.12",
 ]
 
 [dependency-groups]
