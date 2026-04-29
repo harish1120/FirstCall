@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import os
 from fastapi import FastAPI, Request, WebSocket, status, Depends
 from fastapi.responses import Response, StreamingResponse
 from app.agent import build_response, get_session_meta
@@ -8,6 +9,11 @@ from app.database import Base, engine, get_db
 from app import models
 from app.tts import text_to_speech_stream, intro_speech
 from app.stt import transcribe_stream
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_URL = os.getenv("BASE_URL")
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,11 +32,12 @@ async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
     country = form.get("FromCountry", "US")
+    ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Play>https://caterer-divorcee-unloving.ngrok-free.dev/play-intro</Play>
+        <Play>{BASE_URL}/play-intro</Play>
         <Connect>
-            <Stream url="wss://caterer-divorcee-unloving.ngrok-free.dev/stream">
+            <Stream url="{ws_url}/stream">
                 <Parameter name="country" value="{country}"/>
             </Stream>
         </Connect>
@@ -48,7 +55,7 @@ async def handle_speech(request: Request):
         twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
         <Response>
             <Say>Sorry, I didn't catch that. Please describe the emergency.</Say>
-            <Gather input="speech" action="https://caterer-divorcee-unloving.ngrok-free.dev/handle-speech" speechTimeout="auto">                                                                                                          
+            <Gather input="speech" action="{BASE_URL}/handle-speech" speechTimeout="auto">                                                                                                          
             </Gather>
         </Response>
         """
@@ -59,8 +66,8 @@ async def handle_speech(request: Request):
 
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Play>https://caterer-divorcee-unloving.ngrok-free.dev/audio/{call_sid}</Play>
-        <Gather input="speech" action="https://caterer-divorcee-unloving.ngrok-free.dev/handle-speech" speechTimeout="auto">
+        <Play>{BASE_URL}/audio/{call_sid}</Play>
+        <Gather input="speech" action="{BASE_URL}/handle-speech" speechTimeout="auto">
         </Gather>
     </Response>
     """
