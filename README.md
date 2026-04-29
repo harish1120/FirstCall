@@ -7,14 +7,14 @@
 ![ElevenLabs](https://img.shields.io/badge/ElevenLabs-TTS-black?style=for-the-badge&logoColor=white)
 ![Deepgram](https://img.shields.io/badge/Deepgram-STT-101010?style=for-the-badge&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-EC2+RDS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **AI-powered voice agent for medical emergency triage and first aid guidance.**
 
 Pick up the phone. Describe what's happening. FirstCall triages the situation, escalates to 911 if needed, and walks you through exactly what to do — step by step, in real time, until help arrives.
 
-No app. No account. Just a phone call.
+No app. No account. Just a phone call. **[firstcall.help](https://firstcall.help)**
 
 ---
 
@@ -35,6 +35,8 @@ You call the number
         ↓
 Describe the emergency in plain language
         ↓
+Deepgram transcribes speech in real-time (<300ms)
+        ↓
 FirstCall triages severity in seconds
         ↓
 Critical? → "Call 911 right now. While you wait, here's what to do."
@@ -44,6 +46,8 @@ Routine?  → Full step-by-step guidance
 Guided through each step. One at a time. At your pace.
         ↓
 Ask follow-up questions. The agent stays on the line.
+        ↓
+Every call logged anonymously for audit
 ```
 
 ---
@@ -51,12 +55,15 @@ Ask follow-up questions. The agent stays on the line.
 ## Features
 
 - **Voice-first** — No app, no account, no navigation. Just call.
+- **Real-time STT** — Deepgram streaming transcription with <300ms latency.
 - **Instant triage** — Classifies severity (ROUTINE / URGENT / CRITICAL) in the first response.
 - **HITL escalation** — Life-threatening emergencies trigger 911 escalation before any first aid guidance. This is a hardcoded rule, not an LLM decision.
 - **Step-by-step guidance** — One instruction at a time, waits for confirmation before moving on.
 - **Stateful conversation** — Remembers what's been said. Adapts when the caller says "I don't understand" or "what next."
+- **Probing questions** — Asks focused follow-up questions when the initial description is vague.
 - **10 first aid protocols** — Cardiac arrest, choking, severe bleeding, burns, stroke, anaphylaxis, seizure, fracture, head injury, poisoning.
-- **Natural voice** — ElevenLabs TTS for calm, clear audio that doesn't sound robotic in a crisis.
+- **Natural voice** — ElevenLabs TTS streaming back through Twilio Media Streams.
+- **Country detection** — Auto-detects caller's country and uses the correct emergency number (911/999/112/000).
 - **Audit log** — Every call logged with triage tier, condition, and duration. No PII stored.
 
 ---
@@ -77,13 +84,40 @@ Ask follow-up questions. The agent stays on the line.
 
 | Layer | Technology |
 |-------|-----------|
-| Phone | Twilio Programmable Voice |
-| STT | Deepgram Streaming API |
+| Phone | Twilio Programmable Voice + Media Streams |
+| STT | Deepgram Streaming API (nova-2, real-time WebSocket) |
 | Agent | OpenAI GPT-4o |
-| TTS | ElevenLabs (eleven_turbo_v2) |
+| TTS | ElevenLabs (eleven_turbo_v2, ulaw streaming) |
 | Backend | FastAPI + Python 3.12 |
-| Deploy | AWS EC2 + Docker |
-| Database | SQLite → PostgreSQL |
+| Deploy | AWS EC2 + nginx + SSL (Let's Encrypt) |
+| Database | PostgreSQL on AWS RDS (SQLite locally) |
+| Secrets | AWS Secrets Manager |
+
+---
+
+## Architecture
+
+```
+Caller dials firstcall.help number (Twilio)
+        ↓
+POST /voice → FastAPI returns TwiML
+        ↓
+ElevenLabs intro plays via /play-intro
+        ↓
+Twilio opens WebSocket → /stream
+        ↓
+Audio chunks → Deepgram streaming STT
+        ↓
+Transcript → rule-based triage → OpenAI GPT-4o
+        ↓
+Response text → ElevenLabs ulaw audio
+        ↓
+Audio chunks sent back through WebSocket → caller hears response
+        ↓
+Conversation loops until caller hangs up
+        ↓
+POST /call-status → audit log written to RDS
+```
 
 ---
 
@@ -97,6 +131,7 @@ Ask follow-up questions. The agent stays on the line.
 - Twilio account + phone number
 - OpenAI API key
 - ElevenLabs API key
+- Deepgram API key
 
 ### Installation
 
@@ -120,7 +155,7 @@ uv run uvicorn app.main:app --reload --port 8000
 ngrok http 8000
 ```
 
-Point your Twilio number's webhook to `https://your-ngrok-url/voice` and call it.
+Set `BASE_URL` in your `.env` to your ngrok URL, then point your Twilio number's webhook to `https://your-ngrok-url/voice` and call it.
 
 ### Running Tests
 
@@ -140,16 +175,51 @@ uv run ruff format .
 ## Environment Variables
 
 ```env
+# App
+APP_ENV=development          # set to "production" on EC2
+BASE_URL=https://your-ngrok-url
+
+# Twilio
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_PHONE_NUMBER=
 
+# OpenAI
 OPENAI_API_KEY=
 
+# ElevenLabs
 ELEVENLABS_API_KEY=
 
+# Deepgram
 DEEPGRAM_API_KEY=
+
+# Database (production only)
+RDS_SECRET_ARN=
+RDS_HOST=
+RDS_USER=postgres
+RDS_DB=postgres
 ```
+
+---
+
+## Deployment
+
+FirstCall runs on AWS EC2 behind nginx with SSL.
+
+```bash
+# On EC2
+git clone https://github.com/yourusername/firstcall.git
+cd firstcall
+
+# Create .env with production values
+nano .env
+
+# Build and run
+docker build -t firstcall .
+docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall
+```
+
+nginx proxies HTTPS/WSS traffic to FastAPI on port 8000. SSL is managed by Let's Encrypt via Certbot.
 
 ---
 
