@@ -14,7 +14,17 @@
 
 Pick up the phone. Describe what's happening. FirstCall triages the situation, escalates to 911 if needed, and walks you through exactly what to do — step by step, in real time, until help arrives.
 
-No app. No account. Just a phone call. **[firstcall.help](https://firstcall.help)**
+No app. No account. Just a phone call.
+
+---
+
+## 📞 Try It Live
+
+**Call [`+1 (782) 802-0868`](tel:+17828020868) right now.**
+
+Describe any medical emergency in plain language. The agent will triage the situation and guide you through what to do.
+
+> Live demo running on [firstcall.help](https://firstcall.help) — deployed on AWS EC2, available 24/7.
 
 ---
 
@@ -31,7 +41,7 @@ When someone is bleeding in front of you, you're not opening an app or navigatin
 ## How It Works
 
 ```
-You call the number
+You call +1 (782) 802-0868
         ↓
 Describe the emergency in plain language
         ↓
@@ -98,7 +108,7 @@ Every call logged anonymously for audit
 ## Architecture
 
 ```
-Caller dials firstcall.help number (Twilio)
+Caller dials +1 (782) 802-0868 (Twilio)
         ↓
 POST /voice → FastAPI returns TwiML
         ↓
