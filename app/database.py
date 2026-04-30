@@ -8,13 +8,13 @@ from app.secrets import get_db_password
 ENV = os.getenv("APP_ENV", "development")
 
 if ENV == "production":
-    secret_arn = os.getenv("RDS_SECRET_ARN")
+    secret_arn = os.getenv("RDS_SECRET_ARN", "")
     password = get_db_password(secret_arn)
-    host = os.getenv("RDS_HOST")
+    host = os.getenv("RDS_HOST", "")
     user = os.getenv("RDS_USER", "postgres")
     db = os.getenv("RDS_DB", "postgres")
     DATABASE_URL = f"postgresql+psycopg2://{user}:{password}@{host}:5432/{db}"
-    connect_args = {}
+    connect_args: dict[str, object] = {}
     engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
 else:
     DATABASE_URL = "sqlite:///./firstcall.db"

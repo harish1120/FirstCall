@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import Column, Enum, Integer, String
 from sqlalchemy.sql.expression import text
 from sqlalchemy.sql.sqltypes import TIMESTAMP
@@ -11,7 +13,7 @@ class CallLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     call_sid = Column(String, unique=True, index=True)
-    severity = Column(Enum(Severity), nullable=False)
+    severity: Any = Column(Enum(Severity), nullable=False)
     condition = Column(String, nullable=False)
     duration_seconds = Column(Integer, nullable=False, server_default=text("0"))
     created_at = Column(

@@ -53,7 +53,7 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
 if __name__ == "__main__":
 
     async def test():
-        queue = asyncio.Queue()
+        queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
         async def on_transcript(text):
             print(f"Transcript: {text}")
