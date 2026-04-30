@@ -1,40 +1,51 @@
 name: Deploy
 
 on:
-     push:
-          branches:
-               - main
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-     deploy:
-          runs-on: ubuntu-latest
-          environment: production
-          steps:
-               - name: Deploy to EC2
-                 uses: appleboy/ssh-action@v1.0.0
-                 with:
-                    host: ${{ secrets.EC2_HOST}}
-                    username: ${{ secrets.EC2_USER}}
-                    key: ${{ secrets.EC2_SSH_KEY}}
-                    script: |
-                         cd ~/FirstCall
-                         git pull origin main
-                         docker build -t firstcall .
-                         cat > .env << 'EOF'                           
-                         APP_ENV=${{ secrets.APP_ENV }}                                                                                                                                                                
-                         BASE_URL=${{ secrets.BASE_URL }}            
-                         OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}  
-                         TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
-                         TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
-                         TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
-                         DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}
-                         ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
-                         RDS_SECRET_ARN=${{ secrets.RDS_SECRET_ARN }}
-                         RDS_HOST=${{ secrets.RDS_HOST}}
-                         RDS_USER=${{ secrets.RDS_USER }}
-                         RDS_DB=${{ secrets.RDS_DB }}
-                         EOF
-                         docker stop firstcall || true
-                         docker rm firstcall || true
-                         docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall 
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-FirstCall
+          aws-region: ca-central-1
 
+      - name: Deploy to EC2 via SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd ~/FirstCall",
+              "git pull origin main",
+              "cat > .env << EOF\nAPP_ENV=${{ secrets.APP_ENV }}\nBASE_URL=${{ secrets.BASE_URL }}\nOPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\nTWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}\nTWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}\nTWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}\nDEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}\nELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}\nRDS_SECRET_ARN=${{ secrets.RDS_SECRET_ARN }}\nRDS_HOST=${{ secrets.RDS_HOST }}\nRDS_USER=${{ secrets.RDS_USER }}\nRDS_DB=${{ secrets.RDS_DB }}\nEOF",
+              "docker build -t firstcall .",
+              "docker stop firstcall || true",
+              "docker rm firstcall || true",
+              "docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall"
+            ]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query 'StandardOutputContent' \
+            --output text
