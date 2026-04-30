@@ -33,7 +33,9 @@ jobs:
               "docker build -t firstcall .",
               "docker stop firstcall || true",
               "docker rm firstcall || true",
-              "docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall"
+              "docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall",
+              "sudo cp ~/FirstCall/index.html /var/www/html/index.html",
+              "sudo cp -r ~/FirstCall/static/ /var/www/html/static/"   
             ]' \
             --query 'Command.CommandId' \
             --output text)
