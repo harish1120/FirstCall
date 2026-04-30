@@ -1,12 +1,12 @@
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from app.protocols.loader import get_first_aid_protocol
 from app.triage import Severity, get_emergency_number, triage_severity
 
 load_dotenv()
 
-client = OpenAI()
+client = AsyncOpenAI()
 
 sessions: dict = {}
 
@@ -42,7 +42,7 @@ CRITICAL_ESCALATION = (
 )
 
 
-def build_response(description: str, call_sid: str, country_code: str = "US") -> str:
+async def build_response(description: str, call_sid: str, country_code: str = "US") -> str:
     severity = triage_severity(description)
     emergency_number = get_emergency_number(country_code)
     protocol = get_first_aid_protocol(description)
@@ -76,12 +76,15 @@ def build_response(description: str, call_sid: str, country_code: str = "US") ->
         sessions[call_sid]["messages"].append(
             {"role": "user", "content": description})
 
-    # TODO: stream this response back through TTS
-    response = client.chat.completions.create(
-        model="gpt-5.4-mini",
-        messages=sessions[call_sid]["messages"],
-    )
-    reply = response.choices[0].message.content
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-5.4-mini",
+            messages=sessions[call_sid]["messages"],
+        )
+        reply = response.choices[0].message.content
+    except Exception as e:
+        print(f"OpenAI error: {e}")
+        reply = "I am having trouble connecting. Please call 911 directly."
     sessions[call_sid]["messages"].append(
         {"role": "assistant", "content": reply})
     return reply
@@ -89,6 +92,10 @@ def build_response(description: str, call_sid: str, country_code: str = "US") ->
 
 def get_session_meta(call_sid: str) -> dict:
     return sessions.get(call_sid, {})
+
+
+def clear_session(call_sid: str):
+    sessions.pop(call_sid, None)
 
 
 if __name__ == "__main__":
