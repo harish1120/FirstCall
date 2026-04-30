@@ -33,16 +33,13 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
                     await on_transcript(transcript)
 
             connection.on(EventType.MESSAGE, on_message)
-            connection.on(EventType.ERROR, lambda e: print(
-                f"Deepgram error: {e}"))
+            connection.on(EventType.ERROR, lambda e: print(f"Deepgram error: {e}"))
 
             async def send_audio():
                 while True:
                     chunk = await audio_queue.get()
                     if chunk is None:
-                        await connection.send_close_stream(
-                            ListenV2CloseStream(type="CloseStream")
-                        )
+                        await connection.send_close_stream(ListenV2CloseStream(type="CloseStream"))
                         break
                     await connection.send_media(chunk)
 
@@ -52,7 +49,9 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
     except Exception as e:
         print(f"Could not open Deepgram socket: {e}")
 
+
 if __name__ == "__main__":
+
     async def test():
         queue = asyncio.Queue()
 

@@ -19,8 +19,7 @@ if ENV == "production":
 else:
     DATABASE_URL = "sqlite:///./firstcall.db"
     connect_args = {"check_same_thread": False}
-    engine = create_engine(DATABASE_URL, connect_args={
-        "check_same_thread": False}, echo=True)
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, echo=True)
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

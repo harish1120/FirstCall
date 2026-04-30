@@ -55,26 +55,31 @@ async def build_response(description: str, call_sid: str, country_code: str = "U
     else:
         prefix = "Here is what to do: "
 
-    dynamic_system = SYSTEM_PROMPT + f"""                                                                                                                                                                                                                                                                                                                    
+    dynamic_system = (
+        SYSTEM_PROMPT
+        + f"""                                                                                                                                                                                                                                                                                                                    
     Current situation:                                        
     - Severity: {severity}                                                                                                                                                            
     - Emergency number: {emergency_number}
     - Protocol to follow: {protocol}                                                                                                                                                  
     """
+    )
 
     if call_sid not in sessions:
         sessions[call_sid] = {}
         messages = [
             {"role": "system", "content": dynamic_system},
-            {"role": "user", "content": f"{prefix}\n\nSituation: {description}\n\nProtocol hint: {protocol}"},
+            {
+                "role": "user",
+                "content": f"{prefix}\n\nSituation: {description}\n\nProtocol hint: {protocol}",
+            },
         ]
         sessions[call_sid]["messages"] = messages
         sessions[call_sid]["severity"] = severity
         sessions[call_sid]["condition"] = description
 
     else:
-        sessions[call_sid]["messages"].append(
-            {"role": "user", "content": description})
+        sessions[call_sid]["messages"].append({"role": "user", "content": description})
 
     try:
         response = await client.chat.completions.create(
@@ -85,8 +90,7 @@ async def build_response(description: str, call_sid: str, country_code: str = "U
     except Exception as e:
         print(f"OpenAI error: {e}")
         reply = "I am having trouble connecting. Please call 911 directly."
-    sessions[call_sid]["messages"].append(
-        {"role": "assistant", "content": reply})
+    sessions[call_sid]["messages"].append({"role": "assistant", "content": reply})
     return reply
 
 

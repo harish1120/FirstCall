@@ -14,5 +14,5 @@ class CallBase(BaseModel):
 
 
 class CallLogResponse(CallBase):
-     id: int
-     model_config= ConfigDict(from_attributes=True)
+    id: int
+    model_config = ConfigDict(from_attributes=True)
