@@ -1,47 +1,2062 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FirstCall — First Aid Agent Support, just one call away.</title>
-    <link rel="stylesheet" href="static/style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FirstCall — First Aid Agent Support, just one call away.</title>
+<meta name="description" content="FirstCall — AI-powered first aid agent. Pick up the phone, describe the emergency, and get guided through exactly what to do until help arrives.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* FirstCall — clinical-editorial calm. */
+
+:root {
+  /* Palette — dark editorial-clinical (default) */
+  --bg: #0f1614;
+  --bg-2: #131b18;
+  --bg-3: #182220;
+  --fg: #e8efe9;
+  --fg-2: #b8c2bc;
+  --muted: #7d8a82;
+  --rule: #1f2a26;
+  --rule-2: #243430;
+  --accent: oklch(0.62 0.16 25);   /* the only red — call CTA */
+  --accent-soft: oklch(0.62 0.16 25 / 0.10);
+
+  /* Tier colors — calm, distinct, never alarming */
+  --tier-routine: oklch(0.78 0.06 165);   /* soft sage */
+  --tier-urgent:  oklch(0.78 0.09 75);    /* warm wheat */
+  --tier-critical: oklch(0.7 0.15 25);    /* used sparingly */
+
+  --serif: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --sans:  'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, monospace;
+
+  --maxw: 1200px;
+  --pad: clamp(20px, 4vw, 56px);
+  --motion: 1; /* tweak multiplier */
+}
+
+/* Light palette */
+.theme-light {
+  --bg: #f5f1ea;
+  --bg-2: #ece7dd;
+  --bg-3: #e3ddd0;
+  --fg: #1c211e;
+  --fg-2: #3d453f;
+  --muted: #6b7269;
+  --rule: rgba(28,33,30,0.10);
+  --rule-2: rgba(28,33,30,0.18);
+}
+
+/* Cool blue palette */
+.theme-cool {
+  --bg: #eef2f5;
+  --bg-2: #e3e9ee;
+  --bg-3: #d6dee5;
+  --fg: #1a2942;
+  --fg-2: #4a5b73;
+  --muted: #6c7a8e;
+  --rule: rgba(26,41,66,0.10);
+  --rule-2: rgba(26,41,66,0.18);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(255,255,255,0.025), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(255,255,255,0.02), transparent 60%);
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ===== NAV ===== */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  border-bottom: 1px solid var(--rule);
+}
+.nav-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 14px var(--pad);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--fg); color: var(--bg);
+  font-family: var(--serif); font-weight: 500; font-size: 14px;
+  display: grid; place-items: center;
+  letter-spacing: -0.02em;
+}
+.brand-name {
+  font-family: var(--serif); font-weight: 400; font-size: 18px;
+  letter-spacing: -0.01em;
+}
+.nav-links {
+  display: flex; gap: 28px; align-items: center;
+}
+.nav-link {
+  font-size: 13px; color: var(--fg-2);
+  letter-spacing: 0.01em;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: var(--fg); }
+.nav-call {
+  font-family: var(--mono); font-size: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.nav-call:hover { border-color: var(--accent); background: var(--accent-soft); }
+.nav-call .pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: pulseDot calc(2.4s / var(--motion)) infinite;
+}
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 oklch(0.62 0.16 25 / 0.5); }
+  70% { box-shadow: 0 0 0 8px oklch(0.62 0.16 25 / 0); }
+  100% { box-shadow: 0 0 0 0 oklch(0.62 0.16 25 / 0); }
+}
+@media (max-width: 720px) {
+  .nav-links { display: none; }
+}
+
+/* ===== SECTION SCAFFOLD ===== */
+section { padding: clamp(80px, 10vw, 140px) var(--pad); }
+
+.section-head {
+  max-width: 760px;
+  margin: 0 auto clamp(48px, 6vw, 80px);
+  text-align: center;
+}
+.kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+.section-title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(34px, 4.4vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.section-title em {
+  font-style: italic; font-weight: 300;
+  color: var(--fg-2);
+}
+.section-lede {
+  margin-top: 24px;
+  color: var(--fg-2);
+  font-size: 17px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* ===== HERO ===== */
+.hero {
+  padding-top: clamp(60px, 8vw, 100px);
+  padding-bottom: clamp(80px, 10vw, 140px);
+  position: relative;
+}
+.hero::after {
+  content: "";
+  position: absolute; left: var(--pad); right: var(--pad); bottom: 0;
+  height: 1px; background: var(--rule);
+}
+.hero-grid {
+  max-width: var(--maxw); margin: 0 auto;
+  display: grid; grid-template-columns: 1.1fr 1fr;
+  gap: clamp(40px, 5vw, 80px);
+  align-items: center;
+}
+@media (max-width: 880px) {
+  .hero-grid { grid-template-columns: 1fr; }
+}
+.hero-left { max-width: 580px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.18em;
+  color: var(--muted);
+  padding: 8px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  margin-bottom: 28px;
+}
+.eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulseDot calc(2.4s / var(--motion)) infinite;
+}
+.display {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(44px, 6vw, 84px);
+  line-height: 1.0;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.display em {
+  font-style: italic; font-weight: 300;
+  color: var(--fg-2);
+}
+.lede {
+  margin-top: 28px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--fg-2);
+  max-width: 520px;
+  text-wrap: pretty;
+}
+.cta-row {
+  margin-top: 40px;
+  display: flex; flex-wrap: wrap; gap: 24px; align-items: center;
+}
+.cta-call {
+  display: inline-flex; align-items: center; gap: 14px;
+  background: var(--accent); color: white;
+  padding: 14px 22px;
+  border-radius: 14px;
+  border: 1px solid oklch(0.62 0.16 25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 0 0 oklch(0.62 0.16 25 / 0);
+}
+.cta-call:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 40px -10px oklch(0.62 0.16 25 / 0.45);
+}
+.cta-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(255,255,255,0.14);
+  display: grid; place-items: center;
+  color: white;
+}
+.cta-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.1; text-align: left; }
+.cta-label { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.85; }
+.cta-number { font-family: var(--mono); font-size: 15px; font-weight: 500; }
+
+.cta-aside {
+  font-size: 12px; color: var(--muted);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.aside-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aside-row .sep { opacity: 0.5; }
+.aside-row.dim { font-family: var(--mono); font-size: 11px; opacity: 0.7; }
+
+/* Hero rings */
+.hero-right {
+  position: relative;
+  height: clamp(380px, 46vw, 560px);
+  display: grid; place-items: center;
+}
+.rings-stage {
+  position: relative; width: 100%; height: 100%;
+}
+.rings {
+  position: absolute; inset: 0; display: grid; place-items: center;
+}
+.ring {
+  position: absolute;
+  border: 1px solid var(--rule-2);
+  border-radius: 50%;
+  animation: ringPulse calc(4s / var(--motion)) ease-out infinite;
+  opacity: 0;
+}
+.ring.r1 { width: 120px; height: 120px; animation-delay: 0s; }
+.ring.r2 { width: 220px; height: 220px; animation-delay: calc(0.6s / var(--motion)); }
+.ring.r3 { width: 340px; height: 340px; animation-delay: calc(1.2s / var(--motion)); }
+.ring.r4 { width: 480px; height: 480px; animation-delay: calc(1.8s / var(--motion)); }
+@keyframes ringPulse {
+  0% { transform: scale(0.85); opacity: 0; border-color: color-mix(in srgb, var(--fg) 18%, transparent); }
+  10% { opacity: 1; }
+  100% { transform: scale(1.05); opacity: 0; border-color: color-mix(in srgb, var(--fg) 4%, transparent); }
+}
+.ring-core {
+  position: relative;
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg);
+  display: grid; place-items: center;
+  box-shadow:
+    0 0 0 1px var(--rule-2),
+    0 24px 48px -12px rgba(0,0,0,0.5);
+  z-index: 2;
+}
+
+.wave {
+  position: absolute;
+  bottom: 8%;
+  left: 50%; transform: translateX(-50%);
+  display: flex; align-items: end; gap: 3px;
+  height: 56px; width: min(70%, 360px);
+  z-index: 3;
+}
+.wave-bar {
+  flex: 1;
+  background: var(--fg-2);
+  opacity: 0.55;
+  border-radius: 2px;
+  height: 12%;
+  animation: waveOsc calc(1.6s / var(--motion)) ease-in-out infinite;
+  --peak: 70%;
+}
+@keyframes waveOsc {
+  0%, 100% { height: 10%; opacity: 0.35; }
+  50% { height: var(--peak); opacity: 0.85; }
+}
+
+.rings-meta {
+  position: absolute;
+  top: 12px; left: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(10px);
+  min-width: 200px;
+}
+.meta-row { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+.meta-label { letter-spacing: 0.18em; color: var(--fg-2); }
+.meta-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulseDot calc(2s / var(--motion)) infinite;
+}
+.meta-key { color: var(--muted); }
+.meta-val { color: var(--fg-2); }
+
+@media (max-width: 880px) {
+  .rings-meta { display: none; }
+  .ring.r4 { display: none; }
+}
+
+/* ===== TRIAGE DEMO ===== */
+.demo-card {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid; grid-template-columns: 1.1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+@media (max-width: 820px) {
+  .demo-card { grid-template-columns: 1fr; }
+}
+.demo-input-wrap {
+  padding: 28px;
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column; gap: 18px;
+}
+@media (max-width: 820px) {
+  .demo-input-wrap { border-right: none; border-bottom: 1px solid var(--rule); }
+}
+.demo-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.demo-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 14px;
+  font-family: var(--sans);
+  font-size: 16px;
+  color: var(--fg);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.demo-input::placeholder { color: var(--muted); }
+.demo-input:focus { border-color: var(--fg-2); }
+
+.demo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: transparent;
+  border: 1px solid var(--rule-2);
+  color: var(--fg-2);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  transition: all 0.2s;
+}
+.chip:hover { border-color: var(--fg-2); color: var(--fg); }
+
+.demo-output {
+  padding: 28px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.demo-out-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  font-size: 14px;
+}
+.demo-out-key {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.demo-out-val { color: var(--fg-2); font-size: 13px; }
+.demo-out-val.mono { font-family: var(--mono); }
+.demo-out-divider { height: 1px; background: var(--rule); margin: 6px 0; }
+.demo-note {
+  font-size: 14px; color: var(--fg-2); line-height: 1.55;
+  text-wrap: pretty;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+}
+
+/* Tier pills */
+.tier-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.tier-idle { color: var(--muted); border-color: var(--rule-2); }
+.tier-routine  { color: var(--tier-routine); }
+.tier-urgent   { color: var(--tier-urgent); }
+.tier-critical { color: var(--tier-critical); }
+
+.demo-disclaimer {
+  max-width: 760px;
+  margin: 24px auto 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* ===== HOW IT WORKS ===== */
+.how-grid {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  overflow: hidden;
+}
+@media (max-width: 880px) {
+  .how-grid { grid-template-columns: 1fr; }
+}
+.how-step {
+  background: var(--bg);
+  padding: 36px 32px 40px;
+  display: flex; flex-direction: column; gap: 14px;
+  position: relative;
+}
+.how-motif {
+  height: 80px;
+  display: flex; align-items: center; justify-content: flex-start;
+  margin-bottom: 8px;
+  color: var(--fg-2);
+}
+.motif { width: 120px; height: 80px; overflow: visible; }
+.m-core { fill: var(--fg); }
+.m-ring { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0; animation: motifRing calc(3s / var(--motion)) ease-out infinite; }
+.m-r1 { animation-delay: 0s; }
+.m-r2 { animation-delay: calc(0.6s / var(--motion)); }
+.m-r3 { animation-delay: calc(1.2s / var(--motion)); }
+@keyframes motifRing {
+  0% { opacity: 0.6; transform: scale(0.8); transform-origin: 60px 40px; }
+  100% { opacity: 0; transform: scale(1.2); transform-origin: 60px 40px; }
+}
+.motif-wave {
+  display: flex; align-items: end; gap: 3px;
+  width: 120px; height: 80px;
+}
+.m-bar {
+  flex: 1; background: currentColor; opacity: 0.55;
+  border-radius: 1.5px;
+  animation: motifBar calc(1.4s / var(--motion)) ease-in-out infinite;
+}
+@keyframes motifBar {
+  0%, 100% { height: 12%; opacity: 0.3; }
+  50% { height: var(--h, 60%); opacity: 0.8; }
+}
+.m-line { stroke: var(--rule-2); stroke-width: 1; }
+.m-dot { fill: var(--fg-2); }
+.m-d1 { animation: dotFade calc(2.4s / var(--motion)) infinite; }
+.m-d2 { animation: dotFade calc(2.4s / var(--motion)) infinite calc(0.8s / var(--motion)); }
+.m-d3 { animation: dotFade calc(2.4s / var(--motion)) infinite calc(1.6s / var(--motion)); }
+@keyframes dotFade {
+  0%, 100% { opacity: 0.3; r: 5; }
+  50% { opacity: 1; fill: var(--fg); }
+}
+.m-arc { fill: none; stroke: var(--rule-2); stroke-width: 1; stroke-dasharray: 4 4; }
+
+.how-num {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.15em; color: var(--muted);
+}
+.how-title {
+  font-family: var(--serif); font-weight: 400; font-size: 24px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.how-body { font-size: 14px; line-height: 1.6; color: var(--fg-2); }
+
+/* ===== PROTOCOLS ===== */
+.proto-grid {
+  max-width: var(--maxw); margin: 0 auto;
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .proto-grid { grid-template-columns: 1fr; }
+}
+.proto-card {
+  background: var(--bg-2);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.2s, background 0.2s;
+}
+.proto-card:hover { border-color: var(--rule-2); }
+.proto-card.is-open { background: var(--bg-3); border-color: var(--rule-2); }
+
+.proto-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center; gap: 16px;
+  background: transparent; border: none;
+  padding: 18px 20px;
+  text-align: left; color: inherit;
+}
+.proto-num {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); letter-spacing: 0.1em;
+}
+.proto-name {
+  font-family: var(--serif); font-weight: 400; font-size: 19px;
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+.proto-summary {
+  font-size: 12px; color: var(--muted);
+}
+.proto-tier {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.proto-caret { color: var(--muted); transition: transform 0.3s; }
+.proto-card.is-open .proto-caret { transform: rotate(180deg); color: var(--fg-2); }
+
+.proto-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+.proto-card.is-open .proto-body { max-height: 600px; }
+.proto-steps {
+  list-style: none;
+  padding: 4px 20px 24px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  border-top: 1px dashed var(--rule);
+  margin-top: 0;
+  padding-top: 18px;
+}
+.proto-step {
+  display: grid; grid-template-columns: 28px 1fr; gap: 12px;
+  align-items: flex-start;
+}
+.step-num {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.step-text { font-size: 14px; color: var(--fg-2); line-height: 1.55; }
+
+/* ===== SAFETY ===== */
+.safety-tiers {
+  max-width: var(--maxw); margin: 0 auto;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 880px) {
+  .safety-tiers { grid-template-columns: 1fr; }
+}
+.tier-card {
+  padding: 28px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--bg-2);
+  display: flex; flex-direction: column; gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.tier-card-critical {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--bg-2)) 0%, var(--bg-2) 100%);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--rule));
+}
+.tier-mark {
+  width: 32px; height: 4px; border-radius: 2px;
+}
+.tier-routine-mark  { background: var(--tier-routine); }
+.tier-urgent-mark   { background: var(--tier-urgent); }
+.tier-critical-mark { background: var(--tier-critical); }
+
+.tier-name {
+  font-family: var(--serif); font-weight: 400; font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.tier-eg { font-size: 13px; color: var(--muted); line-height: 1.55; }
+.tier-resp {
+  margin-top: 6px;
+  font-size: 14px; color: var(--fg-2); line-height: 1.55;
+  padding-top: 14px;
+  border-top: 1px dashed var(--rule);
+}
+
+.safety-quote {
+  max-width: 760px; margin: 60px auto 0;
+  padding: 36px 40px;
+  border-left: 2px solid var(--accent);
+  position: relative;
+}
+.safety-quote .qmark {
+  position: absolute; left: 24px; top: -8px;
+  font-family: var(--serif); font-size: 60px;
+  color: var(--accent);
+  line-height: 1;
+}
+.safety-quote p {
+  font-family: var(--serif); font-style: italic; font-weight: 300;
+  font-size: clamp(20px, 2.4vw, 28px);
+  line-height: 1.4;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.quote-foot {
+  margin-top: 18px;
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* ===== REASSURE ===== */
+.reassure {
+  padding-top: clamp(60px, 7vw, 100px);
+  padding-bottom: clamp(60px, 7vw, 100px);
+}
+.reassure-grid {
+  max-width: var(--maxw); margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 720px) {
+  .reassure-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.reassure-item {
+  padding: 32px 28px;
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.reassure-item:last-child { border-right: none; }
+@media (max-width: 720px) {
+  .reassure-item:nth-child(2n) { border-right: none; }
+  .reassure-item:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+}
+.r-glyph { color: var(--fg-2); margin-bottom: 6px; }
+.r-title { font-family: var(--serif); font-size: 18px; letter-spacing: -0.005em; }
+.r-body { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+/* ===== CLOSING ===== */
+.closing {
+  padding-top: clamp(80px, 10vw, 140px);
+  padding-bottom: clamp(80px, 10vw, 140px);
+  text-align: center;
+  border-top: 1px solid var(--rule);
+}
+.closing-inner { max-width: 720px; margin: 0 auto; }
+.closing-title {
+  font-family: var(--serif); font-weight: 400;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.05; letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.closing-title em { font-style: italic; font-weight: 300; color: var(--fg-2); }
+.closing-cta { margin-top: 40px; }
+
+/* ===== FOOTER ===== */
+.site-foot {
+  border-top: 1px solid var(--rule);
+  padding: 40px var(--pad);
+}
+.foot-grid {
+  max-width: var(--maxw); margin: 0 auto;
+  display: grid; grid-template-columns: auto 1fr 1fr 1.5fr;
+  gap: 32px; align-items: start;
+}
+@media (max-width: 720px) {
+  .foot-grid { grid-template-columns: 1fr; }
+}
+.foot-brand { display: flex; align-items: center; gap: 10px; }
+.foot-col { display: flex; flex-direction: column; gap: 4px; }
+.foot-key {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted);
+}
+.foot-val { font-size: 13px; color: var(--fg-2); }
+.foot-disclaimer { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+/* ===== Reveal-on-scroll ===== */
+.reveal {
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.is-in {
+  opacity: 1; transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+
+/* Section-hide rules driven by Tweaks */
+.hide-demo #demo,
+.hide-how #how,
+.hide-protocols #protocols,
+.hide-safety #safety,
+.hide-reassure #reassure { display: none; }
+</style>
 </head>
-<body>
-    <header>
-        <h1>FirstCall</h1>
-    </header>
+<body data-screen-label="FirstCall site">
+<div id="top"></div>
+<div id="root"></div>
 
-    <main>
-        <h2>First Aid Agent Support, just one call away.</h2>
-        <p>No app. No account. Just call and get guided through exactly what to do.</p>
-        <a href="tel:+17828020868" class="cta">Call +1 (782) 802-0868</a>
+<!-- React + Babel (production tip: precompile JSX & drop Babel for ~150kb savings) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
-        <section>
-            <h3>How It Works</h3>
-            <div class="steps">
-                <div class="step">
-                    <span>1</span>
-                    <h4>Call the number</h4>
-                    <p>Dial +1 (782) 802-0868. No app, no account, no menu to navigate.</p>
-                </div>
-                <div class="step">
-                    <span>2</span>
-                    <h4>Describe the emergency</h4>
-                    <p>Say what's happening in plain language. "My dad collapsed." "Someone is choking." The AI understands.</p>
-                </div>
-                <div class="step">
-                    <span>3</span>
-                    <h4>Follow the guidance</h4>
-                    <p>FirstCall triages the situation, escalates to 911 if needed, and walks you through exactly what to do — one step at a time.</p>
-                </div>
+<script type="text/babel" data-presets="react">
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+function TweakColor({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <input type="color" className="twk-swatch" value={value}
+             onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Top nav.
+const Nav = () => (
+  <nav className="nav">
+    <div className="nav-inner">
+      <a className="brand" href="#top">
+        <div className="brand-mark">F</div>
+        <div className="brand-name">FirstCall</div>
+      </a>
+      <div className="nav-links">
+        <a className="nav-link" href="#demo">Try it</a>
+        <a className="nav-link" href="#how">How it works</a>
+        <a className="nav-link" href="#protocols">Protocols</a>
+        <a className="nav-link" href="#safety">Safety</a>
+      </div>
+      <a className="nav-call" href="tel:+17828020868">
+        <span className="pulse-dot"></span>
+        <span>+1 (782) 802-0868</span>
+      </a>
+    </div>
+  </nav>
+);
+
+window.Nav = Nav;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Hero — split editorial, with animated rings + waveform on the right.
+const Hero = ({ tweaks }) => {
+  const phone = "+1 (782) 802-0868";
+  const tel = "+17828020868";
+
+  return (
+    <section className="hero">
+      <div className="hero-grid">
+        <div className="hero-left">
+          <div className="eyebrow">
+            <span className="dot" aria-hidden="true"></span>
+            <span>Live · 24/7 · Free to call</span>
+          </div>
+
+          <h1 className="display">
+            First aid,<br />
+            <em>just one call away.</em>
+          </h1>
+
+          <p className="lede">
+            Pick up the phone. Describe what's happening in plain language.
+            FirstCall triages the situation, escalates to emergency services
+            when needed, and walks you through exactly what to do — one step
+            at a time, until help arrives.
+          </p>
+
+          <div className="cta-row">
+            <a href={`tel:${tel}`} className="cta-call">
+              <span className="cta-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </span>
+              <span className="cta-text">
+                <span className="cta-label">Call FirstCall</span>
+                <span className="cta-number">{phone}</span>
+              </span>
+            </a>
+
+            <div className="cta-aside">
+              <div className="aside-row"><span>No app</span><span className="sep">·</span><span>No account</span><span className="sep">·</span><span>No menu</span></div>
+              <div className="aside-row dim">Average response: under 1.5 seconds</div>
             </div>
-        </section>
-    </main>
+          </div>
+        </div>
 
-    <footer>
-        <p>Built by Harish S</p>
-        <p>Powered by Twilio · Deepgram · OpenAI · ElevenLabs</p>
-        <p>For emergencies, always call 911. FirstCall is a guidance tool, not a replacement for emergency services.</p>
-    </footer>
+        <div className="hero-right">
+          <PhoneRings />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Concentric rings + ambient waveform — calm, never red.
+const PhoneRings = () => {
+  return (
+    <div className="rings-stage" aria-hidden="true">
+      <div className="rings">
+        <div className="ring r1"></div>
+        <div className="ring r2"></div>
+        <div className="ring r3"></div>
+        <div className="ring r4"></div>
+        <div className="ring-core">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </div>
+      </div>
+
+      <Waveform />
+
+      <div className="rings-meta">
+        <div className="meta-row">
+          <span className="meta-label">INCOMING</span>
+          <span className="meta-dot"></span>
+        </div>
+        <div className="meta-row">
+          <span className="meta-key">Caller</span>
+          <span className="meta-val">Detecting…</span>
+        </div>
+        <div className="meta-row">
+          <span className="meta-key">Latency</span>
+          <span className="meta-val">— ms</span>
+        </div>
+        <div className="meta-row">
+          <span className="meta-key">Triage</span>
+          <span className="meta-val">awaiting voice</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Waveform = () => {
+  // 48 bars, gently animated via CSS keyframe staggers
+  const bars = Array.from({ length: 48 });
+  return (
+    <div className="wave" aria-hidden="true">
+      {bars.map((_, i) => (
+        <span
+          key={i}
+          className="wave-bar"
+          style={{
+            animationDelay: `${(i % 12) * 0.08}s`,
+            // gentle envelope so middle bars are taller
+            "--peak": `${40 + Math.sin((i / bars.length) * Math.PI) * 60}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+window.Hero = Hero;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Live triage demo — type a scenario, watch it classify.
+// Heuristic classifier (no LLM call, fast + safe).
+const CRITICAL_KEYWORDS = [
+  "not breathing","unresponsive","unconscious","cardiac arrest","heart attack",
+  "choking","can't breathe","cant breathe","blue","stroke","face drooping",
+  "anaphylaxis","throat closing","seizure","convulsing","drowning","drowned",
+  "overdose","poisoning","collapsed","no pulse","bleeding out","gushing"
+];
+const URGENT_KEYWORDS = [
+  "deep cut","laceration","fracture","broken","bone","head injury","hit head",
+  "burn","second degree","third degree","allergic","heavy bleeding",
+  "vomiting blood","dizzy","fainted","chest pain","shortness of breath"
+];
+const ROUTINE_KEYWORDS = [
+  "small cut","scrape","scratch","bruise","sprain","insect","bee sting",
+  "splinter","minor","nosebleed","sunburn","first degree","headache","mild"
+];
+
+const SCENARIOS = [
+  { label: "Cardiac arrest", text: "My dad just collapsed and isn't breathing." },
+  { label: "Choking",        text: "My toddler is choking and can't make a sound." },
+  { label: "Severe bleeding",text: "There's a deep cut on his arm and it's gushing." },
+  { label: "Burn",           text: "I burned my hand on the stove, the skin is red." },
+  { label: "Sprain",         text: "I twisted my ankle on a run, it's swelling a bit." },
+];
+
+const classify = (raw) => {
+  const t = (raw || "").toLowerCase();
+  if (!t.trim()) return null;
+  const hit = (list) => list.find((k) => t.includes(k));
+  const c = hit(CRITICAL_KEYWORDS);
+  if (c) return { tier: "CRITICAL", match: c };
+  const u = hit(URGENT_KEYWORDS);
+  if (u) return { tier: "URGENT", match: u };
+  const r = hit(ROUTINE_KEYWORDS);
+  if (r) return { tier: "ROUTINE", match: r };
+  // default: urgent if longish, else routine
+  return { tier: t.length > 40 ? "URGENT" : "ROUTINE", match: null };
+};
+
+const TIER_COPY = {
+  CRITICAL: {
+    label: "Critical",
+    note: "Life-threatening. FirstCall would tell you to call 911 immediately, then stay on the line and walk you through what to do until help arrives.",
+  },
+  URGENT: {
+    label: "Urgent",
+    note: "Needs medical attention within hours. FirstCall would give you first-aid steps and prompt for emergency transport.",
+  },
+  ROUTINE: {
+    label: "Routine",
+    note: "Manageable at home. FirstCall would walk you through the full first-aid sequence at your pace.",
+  },
+};
+
+const TriageDemo = () => {
+  const [text, setText] = React.useState("");
+  const [touched, setTouched] = React.useState(false);
+  const result = React.useMemo(() => classify(text), [text]);
+
+  const pick = (s) => {
+    setTouched(true);
+    setText(s.text);
+  };
+
+  return (
+    <section className="demo" id="demo">
+      <div className="section-head">
+        <div className="kicker">Try it · interactive</div>
+        <h2 className="section-title">
+          Describe an emergency.<br />
+          <em>See how FirstCall would respond.</em>
+        </h2>
+        <p className="section-lede">
+          A simulation of the first-second triage. The real call uses speech,
+          context, and a hardcoded escalation gate — never an LLM decision —
+          for life-threatening conditions.
+        </p>
+      </div>
+
+      <div className="demo-card">
+        <div className="demo-input-wrap">
+          <label className="demo-label" htmlFor="demo-input">Plain-language description</label>
+          <textarea
+            id="demo-input"
+            className="demo-input"
+            placeholder='e.g. "My grandmother fainted and her lips look blue."'
+            value={text}
+            onChange={(e) => { setText(e.target.value); setTouched(true); }}
+            rows={3}
+          />
+          <div className="demo-chips">
+            {SCENARIOS.map((s) => (
+              <button key={s.label} className="chip" onClick={() => pick(s)} type="button">
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="demo-output">
+          <div className="demo-out-row">
+            <span className="demo-out-key">Triage</span>
+            <span className={`tier-pill tier-${result?.tier?.toLowerCase() || "idle"}`}>
+              {result ? TIER_COPY[result.tier].label : "awaiting input"}
+            </span>
+          </div>
+          <div className="demo-out-row">
+            <span className="demo-out-key">Detected</span>
+            <span className="demo-out-val">
+              {result?.match ? `“${result.match}”` : touched ? "context-based" : "—"}
+            </span>
+          </div>
+          <div className="demo-out-row">
+            <span className="demo-out-key">Latency</span>
+            <span className="demo-out-val mono">{touched ? "~310 ms" : "—"}</span>
+          </div>
+          <div className="demo-out-divider"></div>
+          <p className="demo-note">
+            {result ? TIER_COPY[result.tier].note : "FirstCall classifies severity in the first second of the call. Type or pick a scenario above to simulate."}
+          </p>
+        </div>
+      </div>
+
+      <p className="demo-disclaimer">
+        Demo only — uses a small keyword model in your browser. Not a substitute for the live agent or for emergency services.
+      </p>
+    </section>
+  );
+};
+
+window.TriageDemo = TriageDemo;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// How it works — three-step animated panel with a connecting line and small ambient motions.
+const STEPS = [
+  {
+    n: "01",
+    title: "Call the number",
+    body: "Dial +1 (782) 802-0868 from any phone. No app, no account, no menu to navigate. The line opens in under a second.",
+    motif: "ring",
+  },
+  {
+    n: "02",
+    title: "Describe what's happening",
+    body: 'Speak in plain language. "My dad collapsed." "Someone is choking." "I burned my hand." Real-time speech-to-text in under 300 ms.',
+    motif: "wave",
+  },
+  {
+    n: "03",
+    title: "Follow the guidance",
+    body: "FirstCall triages the situation, escalates to 911 if needed, then walks you through what to do — one step at a time, at your pace.",
+    motif: "steps",
+  },
+];
+
+const HowItWorks = () => {
+  return (
+    <section className="how" id="how">
+      <div className="section-head">
+        <div className="kicker">How it works · three steps</div>
+        <h2 className="section-title">
+          From dialing to first compression.<br />
+          <em>Designed for the worst sixty seconds of your life.</em>
+        </h2>
+      </div>
+
+      <div className="how-grid">
+        {STEPS.map((s, i) => (
+          <article key={s.n} className="how-step" style={{ "--i": i }}>
+            <div className="how-motif">
+              {s.motif === "ring" && <Motif1 />}
+              {s.motif === "wave" && <Motif2 />}
+              {s.motif === "steps" && <Motif3 />}
+            </div>
+            <div className="how-num">{s.n}</div>
+            <h3 className="how-title">{s.title}</h3>
+            <p className="how-body">{s.body}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const Motif1 = () => (
+  <svg viewBox="0 0 120 80" className="motif" aria-hidden="true">
+    <circle cx="60" cy="40" r="8" className="m-core" />
+    <circle cx="60" cy="40" r="18" className="m-ring m-r1" />
+    <circle cx="60" cy="40" r="30" className="m-ring m-r2" />
+    <circle cx="60" cy="40" r="42" className="m-ring m-r3" />
+  </svg>
+);
+
+const Motif2 = () => {
+  const bars = Array.from({ length: 24 });
+  return (
+    <div className="motif motif-wave" aria-hidden="true">
+      {bars.map((_, i) => (
+        <span
+          key={i}
+          className="m-bar"
+          style={{
+            animationDelay: `${(i % 8) * 0.09}s`,
+            "--h": `${20 + Math.sin((i / bars.length) * Math.PI) * 70}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const Motif3 = () => (
+  <svg viewBox="0 0 120 80" className="motif" aria-hidden="true">
+    <line x1="20" y1="60" x2="100" y2="60" className="m-line" />
+    <circle cx="20" cy="60" r="5" className="m-dot m-d1" />
+    <circle cx="60" cy="60" r="5" className="m-dot m-d2" />
+    <circle cx="100" cy="60" r="5" className="m-dot m-d3" />
+    <path d="M20 60 Q 60 20 100 60" className="m-arc" />
+  </svg>
+);
+
+window.HowItWorks = HowItWorks;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Protocols — the 10 conditions FirstCall covers. Click to expand the actual step sequence.
+const PROTOCOLS = [
+  {
+    id: "cardiac",
+    name: "Cardiac arrest",
+    tier: "CRITICAL",
+    summary: "Unresponsive · not breathing normally",
+    steps: [
+      "Call 911 right now — I'll stay with you.",
+      "Lay them flat on their back on a hard surface.",
+      "Place the heel of your hand in the center of the chest.",
+      "Push hard, push fast — about 2 inches deep, 100 to 120 times a minute.",
+      "Don't stop until paramedics arrive or they start breathing.",
+    ],
+  },
+  {
+    id: "choking",
+    name: "Choking",
+    tier: "CRITICAL",
+    summary: "Cannot speak · turning blue",
+    steps: [
+      "Stand behind them and lean them slightly forward.",
+      "Give 5 firm back blows between the shoulder blades.",
+      "If still choking: 5 abdominal thrusts, just above the navel.",
+      "Alternate back blows and abdominal thrusts.",
+      "If they go unconscious — call 911 and start CPR.",
+    ],
+  },
+  {
+    id: "bleeding",
+    name: "Severe bleeding",
+    tier: "CRITICAL",
+    summary: "Not slowing · soaking through",
+    steps: [
+      "Call 911 if blood is gushing or won't stop.",
+      "Press firmly on the wound with a clean cloth.",
+      "Do not lift the cloth — add more on top if it soaks through.",
+      "Keep pressing for at least 10 minutes without checking.",
+      "Have them lie down and keep them warm.",
+    ],
+  },
+  {
+    id: "stroke",
+    name: "Suspected stroke",
+    tier: "CRITICAL",
+    summary: "FAST: Face · Arms · Speech · Time",
+    steps: [
+      "Ask them to smile — does one side droop?",
+      "Ask them to raise both arms — does one drift down?",
+      "Ask them to repeat a simple sentence — is it slurred?",
+      "If any of these are off — call 911 immediately.",
+      "Note the time symptoms started. Do not give food or water.",
+    ],
+  },
+  {
+    id: "anaphylaxis",
+    name: "Anaphylaxis",
+    tier: "CRITICAL",
+    summary: "Throat closing · known allergen",
+    steps: [
+      "Call 911 immediately.",
+      "If they have an EpiPen — use it now, into the outer thigh.",
+      "Help them lie flat with legs raised, unless breathing is hard.",
+      "Loosen tight clothing around the neck.",
+      "If symptoms return after 5–15 min, a second dose may be needed.",
+    ],
+  },
+  {
+    id: "seizure",
+    name: "Seizure",
+    tier: "URGENT",
+    summary: "Convulsing · not stopping",
+    steps: [
+      "Clear the area of anything hard or sharp.",
+      "Place something soft under their head.",
+      "Do not hold them down. Do not put anything in their mouth.",
+      "Time the seizure. If it lasts over 5 minutes — call 911.",
+      "When it stops, roll them onto their side.",
+    ],
+  },
+  {
+    id: "burn",
+    name: "Burns",
+    tier: "URGENT",
+    summary: "1st · 2nd · 3rd degree",
+    steps: [
+      "Move them away from the heat source.",
+      "Run cool (not cold) water over the burn for 20 minutes.",
+      "Do not apply ice, butter, or ointments.",
+      "Cover loosely with a clean, non-stick dressing.",
+      "If skin is white, charred, or larger than your palm — call 911.",
+    ],
+  },
+  {
+    id: "fracture",
+    name: "Fracture",
+    tier: "URGENT",
+    summary: "Suspected broken bone",
+    steps: [
+      "Keep them still — do not try to straighten the limb.",
+      "Support the limb above and below the injury.",
+      "Apply a cold pack wrapped in cloth — never directly on skin.",
+      "Watch for shock: pale, sweaty, shallow breathing.",
+      "Get them to emergency care.",
+    ],
+  },
+  {
+    id: "head",
+    name: "Head injury",
+    tier: "URGENT",
+    summary: "Conscious but hit hard",
+    steps: [
+      "Have them sit or lie down quietly.",
+      "Apply a cold pack to the bump for 20 minutes.",
+      "Watch for: vomiting, confusion, slurred speech, drowsiness.",
+      "If any of those — call 911 immediately.",
+      "Do not let them sleep for the next 2 hours.",
+    ],
+  },
+  {
+    id: "poisoning",
+    name: "Poisoning",
+    tier: "CRITICAL",
+    summary: "Ingested · altered consciousness",
+    steps: [
+      "Call 911 if they're unconscious or seizing.",
+      "Otherwise, call Poison Control: 1-800-222-1222.",
+      "Do not make them vomit unless told to.",
+      "Save the container or substance for paramedics.",
+      "Note the time and how much was taken.",
+    ],
+  },
+];
+
+const Protocols = () => {
+  const [open, setOpen] = React.useState(null);
+
+  return (
+    <section className="protocols" id="protocols">
+      <div className="section-head">
+        <div className="kicker">Coverage · ten protocols</div>
+        <h2 className="section-title">
+          What FirstCall can help with.<br />
+          <em>The ten emergencies most likely to need a stranger's hands.</em>
+        </h2>
+        <p className="section-lede">
+          Each protocol is written in plain language, designed to be spoken aloud
+          and followed under panic. Tap any card to read the actual step sequence.
+        </p>
+      </div>
+
+      <div className="proto-grid">
+        {PROTOCOLS.map((p, i) => (
+          <article
+            key={p.id}
+            className={`proto-card ${open === p.id ? "is-open" : ""}`}
+            style={{ "--i": i }}
+          >
+            <button
+              className="proto-head"
+              onClick={() => setOpen(open === p.id ? null : p.id)}
+              aria-expanded={open === p.id}
+            >
+              <div className="proto-num">{String(i + 1).padStart(2, "0")}</div>
+              <div className="proto-text">
+                <div className="proto-name">{p.name}</div>
+                <div className="proto-summary">{p.summary}</div>
+              </div>
+              <div className={`proto-tier tier-${p.tier.toLowerCase()}`}>{p.tier}</div>
+              <div className="proto-caret" aria-hidden="true">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 6l4 4 4-4" />
+                </svg>
+              </div>
+            </button>
+
+            <div className="proto-body" aria-hidden={open !== p.id}>
+              <ol className="proto-steps">
+                {p.steps.map((s, idx) => (
+                  <li key={idx} className="proto-step">
+                    <span className="step-num">{idx + 1}</span>
+                    <span className="step-text">{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+window.Protocols = Protocols;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Safety — explains the HITL escalation gate, calmly.
+const Safety = () => {
+  return (
+    <section className="safety" id="safety">
+      <div className="section-head">
+        <div className="kicker">How it stays safe</div>
+        <h2 className="section-title">
+          The 911 gate is hardcoded.<br />
+          <em>Not a model decision.</em>
+        </h2>
+        <p className="section-lede">
+          For life-threatening conditions, FirstCall escalates to emergency services
+          before any first-aid guidance. This is rule-based — not something the
+          language model can override or talk you out of.
+        </p>
+      </div>
+
+      <div className="safety-tiers">
+        <article className="tier-card">
+          <div className="tier-mark tier-routine-mark"></div>
+          <div className="tier-name">Tier 1 · Routine</div>
+          <div className="tier-eg">Small cuts · 1st-degree burns · mild sprains · insect bites</div>
+          <div className="tier-resp">Full first-aid guidance, at your pace.</div>
+        </article>
+
+        <article className="tier-card">
+          <div className="tier-mark tier-urgent-mark"></div>
+          <div className="tier-name">Tier 2 · Urgent</div>
+          <div className="tier-eg">Deep lacerations · suspected fractures · 2nd-degree burns · conscious head injury</div>
+          <div className="tier-resp">First aid + prompt for emergency transport.</div>
+        </article>
+
+        <article className="tier-card tier-card-critical">
+          <div className="tier-mark tier-critical-mark"></div>
+          <div className="tier-name">Tier 3 · Critical</div>
+          <div className="tier-eg">Cardiac arrest · choking · stroke · anaphylaxis · severe bleeding</div>
+          <div className="tier-resp">911 escalation first. Then concurrent guidance until help arrives.</div>
+        </article>
+      </div>
+
+      <blockquote className="safety-quote">
+        <span className="qmark" aria-hidden="true">“</span>
+        <p>
+          This is a 911 emergency. Call 911 right now — I'll stay with you.
+          Tell the operator what happened. While you wait, here's what to do…
+        </p>
+        <footer className="quote-foot">— Hardcoded Tier 3 response pattern</footer>
+      </blockquote>
+    </section>
+  );
+};
+
+window.Safety = Safety;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Reassurance strip + closing CTA + footer.
+const Reassurance = () => (
+  <section className="reassure" id="reassure">
+    <div className="reassure-grid">
+      <div className="reassure-item">
+        <div className="r-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2v20M2 12h20" />
+          </svg>
+        </div>
+        <div className="r-title">Free to call</div>
+        <div className="r-body">Standard call rates apply. No subscription, no upcharge, no upsell.</div>
+      </div>
+      <div className="reassure-item">
+        <div className="r-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" /><path d="M8 12h8" />
+          </svg>
+        </div>
+        <div className="r-title">No account, no app</div>
+        <div className="r-body">Nothing to install. Nothing to log into. Just a phone number.</div>
+      </div>
+      <div className="reassure-item">
+        <div className="r-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+        </div>
+        <div className="r-title">No PII stored</div>
+        <div className="r-body">Calls are logged anonymously — triage tier, condition, duration. Nothing identifying.</div>
+      </div>
+      <div className="reassure-item">
+        <div className="r-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+          </svg>
+        </div>
+        <div className="r-title">Always on</div>
+        <div className="r-body">24 hours a day. Sub-1.5-second voice loop. Available the moment you dial.</div>
+      </div>
+    </div>
+  </section>
+);
+
+const ClosingCTA = () => (
+  <section className="closing">
+    <div className="closing-inner">
+      <h2 className="closing-title">
+        When the worst happens,<br />
+        <em>be the calm in the room.</em>
+      </h2>
+      <a href="tel:+17828020868" className="cta-call closing-cta">
+        <span className="cta-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </span>
+        <span className="cta-text">
+          <span className="cta-label">Save it to your phone</span>
+          <span className="cta-number">+1 (782) 802-0868</span>
+        </span>
+      </a>
+    </div>
+  </section>
+);
+
+const Footer = () => (
+  <footer className="site-foot">
+    <div className="foot-grid">
+      <div className="foot-brand">
+        <div className="brand-mark">FC</div>
+        <div className="brand-name">FirstCall</div>
+      </div>
+      <div className="foot-col">
+        <div className="foot-key">Built by</div>
+        <div className="foot-val">Harish S</div>
+      </div>
+      <div className="foot-col">
+        <div className="foot-key">Powered by</div>
+        <div className="foot-val">Twilio · Deepgram · OpenAI · ElevenLabs</div>
+      </div>
+      <div className="foot-col foot-disclaimer">
+        For emergencies, always call 911. FirstCall is a guidance tool — not a
+        replacement for emergency services.
+      </div>
+    </div>
+  </footer>
+);
+
+window.Reassurance = Reassurance;
+window.ClosingCTA = ClosingCTA;
+window.SiteFooter = Footer;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// Tweaks panel — palette, motion, sections.
+const FirstCallTweaks = () => {
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "palette": "dark",
+    "motion": 40,
+    "showDemo": true,
+    "showHow": true,
+    "showProtocols": true,
+    "showSafety": true,
+    "showReassure": true
+  }/*EDITMODE-END*/;
+
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Apply palette + motion to <html>
+  React.useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("theme-light", "theme-cool");
+    if (tweaks.palette === "light") root.classList.add("theme-light");
+    if (tweaks.palette === "cool") root.classList.add("theme-cool");
+    root.style.setProperty("--motion", String((tweaks.motion ?? 40) / 40));
+  }, [tweaks.palette, tweaks.motion]);
+
+  // Toggle section visibility via class on body
+  React.useEffect(() => {
+    const b = document.body;
+    b.classList.toggle("hide-demo", !tweaks.showDemo);
+    b.classList.toggle("hide-how", !tweaks.showHow);
+    b.classList.toggle("hide-protocols", !tweaks.showProtocols);
+    b.classList.toggle("hide-safety", !tweaks.showSafety);
+    b.classList.toggle("hide-reassure", !tweaks.showReassure);
+  }, [tweaks.showDemo, tweaks.showHow, tweaks.showProtocols, tweaks.showSafety, tweaks.showReassure]);
+
+  return (
+    <TweaksPanel>
+      <TweakSection title="Palette">
+        <TweakRadio
+          label="Theme"
+          value={tweaks.palette}
+          options={[
+            { value: "dark", label: "Dark" },
+            { value: "light", label: "Paper" },
+            { value: "cool", label: "Cool" },
+          ]}
+          onChange={(v) => setTweak("palette", v)}
+        />
+      </TweakSection>
+
+      <TweakSection title="Motion">
+        <TweakSlider
+          label="Animation speed"
+          value={tweaks.motion}
+          min={0} max={100} step={10}
+          onChange={(v) => setTweak("motion", v)}
+        />
+      </TweakSection>
+
+      <TweakSection title="Sections">
+        <TweakToggle label="Live triage demo" value={tweaks.showDemo} onChange={(v) => setTweak("showDemo", v)} />
+        <TweakToggle label="How it works" value={tweaks.showHow} onChange={(v) => setTweak("showHow", v)} />
+        <TweakToggle label="Protocols (10)" value={tweaks.showProtocols} onChange={(v) => setTweak("showProtocols", v)} />
+        <TweakToggle label="How it stays safe" value={tweaks.showSafety} onChange={(v) => setTweak("showSafety", v)} />
+        <TweakToggle label="Reassurance strip" value={tweaks.showReassure} onChange={(v) => setTweak("showReassure", v)} />
+      </TweakSection>
+    </TweaksPanel>
+  );
+};
+
+window.FirstCallTweaks = FirstCallTweaks;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+const App = () => {
+  React.useEffect(() => {
+    const els = document.querySelectorAll(".reveal");
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-in");
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.05 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <React.Fragment>
+      <Nav />
+      <main>
+        <Hero />
+        <div className="reveal"><TriageDemo /></div>
+        <div className="reveal"><HowItWorks /></div>
+        <div className="reveal"><Protocols /></div>
+        <div className="reveal"><Safety /></div>
+        <div className="reveal"><Reassurance /></div>
+        <div className="reveal"><ClosingCTA /></div>
+      </main>
+      <SiteFooter />
+      <FirstCallTweaks />
+    </React.Fragment>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
 </body>
 </html>
