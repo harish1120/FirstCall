@@ -78,11 +78,15 @@ async def stream(websocket: WebSocket):
             print(f"{country_code}")
             response = await asyncio.to_thread(build_response, text, call_sid, country_code)
             for chunk in text_to_speech_stream(response):
-                await websocket.send_text(json.dumps({
-                    "event": "media",
-                    "streamSid": stream_sid,
-                    "media": {"payload": base64.b64encode(chunk).decode("utf-8")}
-                }))
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "event": "media",
+                            "streamSid": stream_sid,
+                            "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                        }
+                    )
+                )
         except Exception as e:
             print(f"Error in on_transcript: {e}")
 
@@ -94,8 +98,7 @@ async def stream(websocket: WebSocket):
         if data["event"] == "start":
             call_sid = data["start"]["callSid"]
             stream_sid = data["start"]["streamSid"]
-            country_code = data["start"]["customParameters"].get(
-                "country", "US")
+            country_code = data["start"]["customParameters"].get("country", "US")
         elif data["event"] == "media":
             audio = base64.b64decode(data["media"]["payload"])
             await audio_queue.put(audio)
@@ -114,12 +117,17 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
     if not session_meta:
         return {"status": "no session"}
 
-    call_log = models.CallLog(call_sid=call_sid, duration_seconds=int(duration_seconds),
-                              severity=session_meta['severity'], condition=session_meta['condition'])
+    call_log = models.CallLog(
+        call_sid=call_sid,
+        duration_seconds=int(duration_seconds),
+        severity=session_meta["severity"],
+        condition=session_meta["condition"],
+    )
     db.add(call_log)
     db.commit()
     clear_session(call_sid)
     return {"status": "logged"}
+
 
 #################################################### V.1.0####################################################
 # @app.get("/audio/{call_sid}")

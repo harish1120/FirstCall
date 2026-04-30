@@ -1,4 +1,3 @@
-
 import os
 from collections.abc import Generator
 
@@ -37,7 +36,7 @@ def text_to_speech_stream(text: str) -> Generator[bytes, None, None]:
     )
 
     # Create a BytesIO object to hold the audio data in memory
-#     audio_stream = BytesIO()
+    #     audio_stream = BytesIO()
 
     # Write each chunk of audio data to the stream
     for chunk in response:
@@ -45,6 +44,8 @@ def text_to_speech_stream(text: str) -> Generator[bytes, None, None]:
             yield chunk
 
     # Reset stream position to the beginning
+
+
 #     audio_stream.seek(0)
 
 #     # Return the stream for further use
@@ -69,7 +70,7 @@ def intro_speech(text: str) -> Generator[bytes, None, None]:
     )
 
     # Create a BytesIO object to hold the audio data in memory
-#     audio_stream = BytesIO()
+    #     audio_stream = BytesIO()
 
     # Write each chunk of audio data to the stream
     for chunk in response:

@@ -8,16 +8,44 @@ class Severity(StrEnum):
 
 
 CRITICAL_KEYWORDS = [
-    "not breathing", "cardiac arrest", "heart attack", "choking", "can't breathe",
-    "severe bleeding", "won't stop bleeding", "stroke", "face drooping",
-    "anaphylaxis", "throat closing", "allergic reaction", "seizure", "convulsing",
-    "poisoning", "overdose", "drowning", "unresponsive", "unconscious",
+    "not breathing",
+    "cardiac arrest",
+    "heart attack",
+    "choking",
+    "can't breathe",
+    "severe bleeding",
+    "won't stop bleeding",
+    "stroke",
+    "face drooping",
+    "anaphylaxis",
+    "throat closing",
+    "allergic reaction",
+    "seizure",
+    "convulsing",
+    "poisoning",
+    "overdose",
+    "drowning",
+    "unresponsive",
+    "unconscious",
 ]
 
 URGENT_KEYWORDS = [
-    "broken bone", "fracture", "deep cut", "laceration", "moderate burn",
-    "head injury", "fell", "high fever", "chest pain", "hit by", "car accident", "accident", "fell",
-    "knocked out", "unconscious", "trauma",
+    "broken bone",
+    "fracture",
+    "deep cut",
+    "laceration",
+    "moderate burn",
+    "head injury",
+    "fell",
+    "high fever",
+    "chest pain",
+    "hit by",
+    "car accident",
+    "accident",
+    "fell",
+    "knocked out",
+    "unconscious",
+    "trauma",
 ]
 
 
@@ -33,7 +61,8 @@ def triage_severity(description: str) -> Severity:
 
 def get_emergency_number(country_code: str) -> str:
     numbers = {
-        "US": "911", "CA": "911",
+        "US": "911",
+        "CA": "911",
         "GB": "999",
         "AU": "000",
         "DEFAULT": "112",
