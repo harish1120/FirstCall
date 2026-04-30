@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     ROUTINE = "ROUTINE"
     URGENT = "URGENT"
     CRITICAL = "CRITICAL"

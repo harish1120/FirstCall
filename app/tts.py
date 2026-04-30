@@ -1,6 +1,7 @@
 
 import os
-from typing import Generator
+from collections.abc import Generator
+
 # from io import BytesIO
 from dotenv import load_dotenv
 from elevenlabs import VoiceSettings

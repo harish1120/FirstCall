@@ -1,7 +1,8 @@
-from app.database import Base
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Enum, null
+from sqlalchemy import Column, Enum, Integer, String
+from sqlalchemy.sql.expression import text
 from sqlalchemy.sql.sqltypes import TIMESTAMP
-from sqlalchemy.sql.expression import text, func
+
+from app.database import Base
 from app.triage import Severity
 
 
