@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=for-the-badge&logo=openai&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.4_mini-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white)
 ![ElevenLabs](https://img.shields.io/badge/ElevenLabs-TTS-black?style=for-the-badge&logoColor=white)
 ![Deepgram](https://img.shields.io/badge/Deepgram-STT-101010?style=for-the-badge&logoColor=white)
@@ -96,7 +96,7 @@ Every call logged anonymously for audit
 |-------|-----------|
 | Phone | Twilio Programmable Voice + Media Streams |
 | STT | Deepgram Streaming API (nova-2, real-time WebSocket) |
-| Agent | OpenAI GPT-4o |
+| Agent | OpenAI GPT-5.4 mini |
 | TTS | ElevenLabs (eleven_turbo_v2, ulaw streaming) |
 | Backend | FastAPI + Python 3.12 |
 | Deploy | AWS EC2 + nginx + SSL (Let's Encrypt) |
