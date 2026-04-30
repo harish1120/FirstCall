@@ -27,15 +27,16 @@ jobs:
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
-              "cd ~/FirstCall",
+              "cd /home/ubuntu/FirstCall",
               "git pull origin main",
               "cat > .env << EOF\nAPP_ENV=${{ secrets.APP_ENV }}\nBASE_URL=${{ secrets.BASE_URL }}\nOPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\nTWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}\nTWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}\nTWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}\nDEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}\nELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}\nRDS_SECRET_ARN=${{ secrets.RDS_SECRET_ARN }}\nRDS_HOST=${{ secrets.RDS_HOST }}\nRDS_USER=${{ secrets.RDS_USER }}\nRDS_DB=${{ secrets.RDS_DB }}\nEOF",
               "docker build -t firstcall .",
               "docker stop firstcall || true",
               "docker rm firstcall || true",
               "docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall",
-              "sudo cp ~/FirstCall/index.html /var/www/html/index.html",
-              "sudo cp -r ~/FirstCall/static/ /var/www/html/static/"   
+              "cp /home/ubuntu/FirstCall/index.html /var/www/html/index.html",
+              "cp -r /home/ubuntu/FirstCall/static/ /var/www/html/static/",
+              "chown -R www-data:www-data /var/www/html/"
             ]' \
             --query 'Command.CommandId' \
             --output text)
