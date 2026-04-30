@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+     push:
+          branches:
+               - main
+
+jobs:
+     deploy:
+          runs-on: ubuntu-latest
+          environment: production
+          steps:
+               - name: Deploy to EC2
+                 uses: appleboy/ssh-action@v1.0.0
+                 with:
+                    host: ${{ secrets.EC2_HOST}}
+                    username: ${{ secrets.EC2_USER}}
+                    key: ${{ secrets.EC2_SSH_KEY}}
+                    script: |
+                         cd ~/FirstCall
+                         git pull origin main
+                         docker build -t firstcall .
+                         cat > .env << 'EOF'                           
+                         APP_ENV=${{ secrets.APP_ENV }}                                                                                                                                                                
+                         BASE_URL=${{ secrets.BASE_URL }}            
+                         OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}  
+                         TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+                         TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
+                         TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
+                         DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}
+                         ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
+                         RDS_SECRET_ARN=${{ secrets.RDS_SECRET_ARN }}
+                         RDS_HOST=${{ secrets.RDS_HOST}}
+                         RDS_USER=${{ secrets.RDS_USER }}
+                         RDS_DB=${{ secrets.RDS_DB }}
+                         EOF
+                         docker stop firstcall || true
+                         docker rm firstcall || true
+                         docker run -d -p 8000:8000 --env-file .env --name firstcall firstcall 
+
