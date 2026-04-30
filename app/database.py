@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
 import os
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 from app.secrets import get_db_password
 
 ENV = os.getenv("APP_ENV", "development")

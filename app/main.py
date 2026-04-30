@@ -2,17 +2,19 @@ import asyncio
 import base64
 import json
 import os
-from fastapi import FastAPI, Request, WebSocket, status, Depends
-from fastapi.responses import Response, StreamingResponse
-from app.agent import build_response, get_session_meta, clear_session
-from app.database import Base, engine, get_db
-from app import models
-from app.tts import text_to_speech_stream, intro_speech
-from app.stt import transcribe_stream
+
 from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Request, WebSocket, status
+from fastapi.responses import Response, StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from twilio.request_validator import RequestValidator
+
+from app import models
+from app.agent import build_response, clear_session, get_session_meta
+from app.database import Base, engine, get_db
+from app.stt import transcribe_stream
+from app.tts import intro_speech, text_to_speech_stream
 
 load_dotenv()
 
@@ -103,7 +105,7 @@ async def stream(websocket: WebSocket):
 
 
 @app.api_route("/call-status", methods=["GET", "POST"], status_code=status.HTTP_201_CREATED)
-async def call_status(request: Request, db=Depends(get_db)):
+async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
     form = await request.form()
     call_sid = form.get("CallSid")
     duration_seconds = form.get("CallDuration")

@@ -1,8 +1,9 @@
 import asyncio
 import os
+
 from deepgram import AsyncDeepgramClient
 from deepgram.core.events import EventType
-from deepgram.listen.v2.types import ListenV2TurnInfo, ListenV2CloseStream
+from deepgram.listen.v2.types import ListenV2CloseStream, ListenV2TurnInfo
 
 
 async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
