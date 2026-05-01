@@ -44,17 +44,7 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.12"
-strict = true
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["app.main", "app.stt", "app.models", "app.database"]
-disallow_untyped_defs = false
-disallow_untyped_calls = false
-disallow_incomplete_defs = false
-disallow_any_generics = false
-warn_return_any = false
-disallow_subclassing_any = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

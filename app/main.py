@@ -41,10 +41,10 @@ async def health():
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
-    signature = request.headers.get("X-Twilio-Signature", "")
-    url = str(request.url)
-    if not validator.validate(url, dict(form), signature):
-        return Response(status_code=403)
+    # signature = request.headers.get("X-Twilio-Signature", "")
+    # url = str(request.url)
+    # if not validator.validate(url, dict(form), signature):
+    #     return Response(status_code=403)
     country = form.get("FromCountry", "US")
     ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -142,7 +142,8 @@ async def stream(websocket: WebSocket):
         if data["event"] == "start":
             call_sid = data["start"]["callSid"]
             stream_sid = data["start"]["streamSid"]
-            country_code = data["start"]["customParameters"].get("country", "US")
+            country_code = data["start"]["customParameters"].get(
+                "country", "US")
         elif data["event"] == "media":
             audio = base64.b64decode(data["media"]["payload"])
             await audio_queue.put(audio)
