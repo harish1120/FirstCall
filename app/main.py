@@ -142,8 +142,7 @@ async def stream(websocket: WebSocket):
         if data["event"] == "start":
             call_sid = data["start"]["callSid"]
             stream_sid = data["start"]["streamSid"]
-            country_code = data["start"]["customParameters"].get(
-                "country", "US")
+            country_code = data["start"]["customParameters"].get("country", "US")
         elif data["event"] == "media":
             audio = base64.b64decode(data["media"]["payload"])
             await audio_queue.put(audio)

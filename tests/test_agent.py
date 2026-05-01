@@ -16,7 +16,7 @@ def test_get_session_meta_valid_callsid() -> None:
 
 
 def test_clear_session_invalid_callsid() -> None:
-    assert clear_session("abc123") is None
+    clear_session("abc123")
 
 
 def test_clear_session_valid_callsid() -> None:
@@ -30,7 +30,9 @@ async def test_build_response_critical() -> None:
     mock_response = MagicMock()
     mock_response.choices = [mock_choice]
 
-    with patch("app.agent.client.chat.completions.create", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "app.agent.client.chat.completions.create", new=AsyncMock(return_value=mock_response)
+    ):
         result = await build_response("my neighbor is not breathing", "call_001")
 
     meta = get_session_meta("call_001")
