@@ -41,6 +41,7 @@ jobs:
               "echo DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }} >> /home/ubuntu/FirstCall/.env",
               "echo ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }} >> /home/ubuntu/FirstCall/.env",
               "echo REDIS_HOST=${{ secrets.REDIS_HOST }} >> /home/ubuntu/FirstCall/.env",
+              "echo REDIS_SSL=true >> /home/ubuntu/FirstCall/.env",
               "echo RDS_SECRET_ARN=${{ secrets.RDS_SECRET_ARN }} >> /home/ubuntu/FirstCall/.env",
               "echo RDS_HOST=${{ secrets.RDS_HOST }} >> /home/ubuntu/FirstCall/.env",
               "echo RDS_USER=${{ secrets.RDS_USER }} >> /home/ubuntu/FirstCall/.env",

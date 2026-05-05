@@ -12,7 +12,10 @@ from app.triage import Severity, get_emergency_number, triage_severity
 load_dotenv()
 
 client = AsyncOpenAI()
-r = redis.Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0)
+_redis_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
+r = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0, ssl=_redis_ssl, ssl_cert_reqs="none"
+)
 
 # sessions: dict[str, Any] = {}
 
