@@ -31,8 +31,15 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
                 event = getattr(message, "event", None) or (
                     message.get("event") if isinstance(message, dict) else None
                 )
-                print(f"[STT] transcript={repr(transcript)} event={repr(event)}")
-                if transcript and event == "EndOfTurn":
+                eot_confidence = (
+                    message.get("end_of_turn_confidence", 0) if isinstance(message, dict) else 0
+                )
+                print(
+                    f"[STT] transcript={repr(transcript)} event={repr(event)} eot_conf={eot_confidence:.2f}"
+                )
+                is_end_of_turn = event == "EndOfTurn"
+                is_high_confidence_final = event == "Update" and eot_confidence >= 0.8
+                if transcript and (is_end_of_turn or is_high_confidence_final):
                     await on_transcript(transcript)
 
             connection.on(EventType.MESSAGE, on_message)
