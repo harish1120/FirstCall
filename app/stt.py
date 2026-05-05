@@ -19,6 +19,8 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
         ) as connection:
             print("[STT] Deepgram connected")
 
+            responded_turns: set[int] = set()
+
             async def on_message(message):
                 print(f"[STT] on_message fired: type={type(message).__name__} raw={message}")
                 if isinstance(message, ListenV2TurnInfo):
@@ -34,12 +36,19 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
                 eot_confidence = (
                     message.get("end_of_turn_confidence", 0) if isinstance(message, dict) else 0
                 )
+                turn_index = message.get("turn_index", -1) if isinstance(message, dict) else -1
                 print(
                     f"[STT] transcript={repr(transcript)} event={repr(event)} eot_conf={eot_confidence:.2f}"
                 )
                 is_end_of_turn = event == "EndOfTurn"
-                is_high_confidence_final = event == "Update" and eot_confidence >= 0.8
-                if transcript and (is_end_of_turn or is_high_confidence_final):
+                is_high_confidence_final = event == "Update" and eot_confidence >= 0.5
+                if (
+                    transcript
+                    and turn_index not in responded_turns
+                    and (is_end_of_turn or is_high_confidence_final)
+                ):
+                    responded_turns.add(turn_index)
+                    print(f"[STT] Firing on_transcript for turn {turn_index}: {repr(transcript)}")
                     await on_transcript(transcript)
 
             connection.on(EventType.MESSAGE, on_message)
