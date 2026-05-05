@@ -143,9 +143,11 @@ async def stream(websocket: WebSocket):
             call_sid = data["start"]["callSid"]
             stream_sid = data["start"]["streamSid"]
             country_code = data["start"]["customParameters"].get("country", "US")
+            print(f"[WS] Stream started: call_sid={call_sid}")
         elif data["event"] == "media":
             audio = base64.b64decode(data["media"]["payload"])
             await audio_queue.put(audio)
         elif data["event"] == "stop":
+            print("[WS] Stream stopped")
             await audio_queue.put(None)
             break

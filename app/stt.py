@@ -10,14 +10,17 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
     deepgram = AsyncDeepgramClient(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     try:
+        print("[STT] Connecting to Deepgram...")
         async with deepgram.listen.v2.connect(
             model="flux-general-en",
             encoding="mulaw",
             sample_rate="8000",
             eot_timeout_ms="1000",
         ) as connection:
+            print("[STT] Deepgram connected")
 
             async def on_message(message):
+                print(f"[STT] on_message fired: type={type(message).__name__} raw={message}")
                 if isinstance(message, ListenV2TurnInfo):
                     transcript = message.transcript
                 elif isinstance(message, dict):
@@ -25,29 +28,36 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
                 else:
                     transcript = getattr(message, "transcript", "")
 
-                # Only act on EndOfTurn for a complete utterance
                 event = getattr(message, "event", None) or (
                     message.get("event") if isinstance(message, dict) else None
                 )
+                print(f"[STT] transcript={repr(transcript)} event={repr(event)}")
                 if transcript and event == "EndOfTurn":
                     await on_transcript(transcript)
 
             connection.on(EventType.MESSAGE, on_message)
-            connection.on(EventType.ERROR, lambda e: print(f"Deepgram error: {e}"))
+            connection.on(EventType.ERROR, lambda e: print(f"[STT] Deepgram error: {e}"))
 
             async def send_audio():
+                chunks_sent = 0
                 while True:
                     chunk = await audio_queue.get()
                     if chunk is None:
+                        print(f"[STT] send_audio done — sent {chunks_sent} chunks")
                         await connection.send_close_stream(ListenV2CloseStream(type="CloseStream"))
                         break
+                    chunks_sent += 1
+                    if chunks_sent == 1:
+                        print("[STT] First audio chunk sent to Deepgram")
                     await connection.send_media(chunk)
 
             asyncio.create_task(send_audio())
+            print("[STT] start_listening...")
             await connection.start_listening()
+            print("[STT] start_listening returned")
 
     except Exception as e:
-        print(f"Could not open Deepgram socket: {e}")
+        print(f"[STT] Could not open Deepgram socket: {e}")
 
 
 if __name__ == "__main__":
