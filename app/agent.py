@@ -1,5 +1,8 @@
+import json
+import os
 from typing import Any
 
+import redis
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
@@ -9,8 +12,9 @@ from app.triage import Severity, get_emergency_number, triage_severity
 load_dotenv()
 
 client = AsyncOpenAI()
+r = redis.Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0)
 
-sessions: dict[str, Any] = {}
+# sessions: dict[str, Any] = {}
 
 SYSTEM_PROMPT = """You are FirstCall, a calm and clear emergency first aid assistant.
 You are on a live phone call with someone in a medical emergency.
@@ -44,6 +48,19 @@ CRITICAL_ESCALATION = (
 )
 
 
+def get_session(call_sid):
+    data = r.get(call_sid)
+    return json.loads(data) if data else None
+
+
+def save_session(call_sid, session_data):
+    r.setex(call_sid, 3600, json.dumps(session_data))  # 1 hour TTL
+
+
+def clear_session(call_sid):
+    r.delete(call_sid)
+
+
 async def build_response(description: str, call_sid: str, country_code: str = "US") -> str:
     severity = triage_severity(description)
     emergency_number = get_emergency_number(country_code)
@@ -67,42 +84,43 @@ async def build_response(description: str, call_sid: str, country_code: str = "U
     """
     )
 
-    if call_sid not in sessions:
-        sessions[call_sid] = {}
-        messages = [
-            {"role": "system", "content": dynamic_system},
-            {
-                "role": "user",
-                "content": f"{prefix}\n\nSituation: {description}\n\nProtocol hint: {protocol}",
-            },
-        ]
-        sessions[call_sid]["messages"] = messages
-        sessions[call_sid]["severity"] = severity
-        sessions[call_sid]["condition"] = description
+    session = get_session(call_sid)
+    if session is None:
+        session = {
+            "messages": [
+                {"role": "system", "content": dynamic_system},
+                {
+                    "role": "user",
+                    "content": f"{prefix}\n\nSituation: {description}\n\nProtocol hint: {protocol}",
+                },
+            ],
+            "severity": severity,
+            "condition": description,
+        }
 
+        save_session(call_sid, session)
     else:
-        sessions[call_sid]["messages"].append({"role": "user", "content": description})
+        session["messages"].append({"role": "user", "content": description})
+        save_session(call_sid, session)
 
     try:
         response = await client.chat.completions.create(
             model="gpt-5.4-mini",
-            messages=sessions[call_sid]["messages"],
+            messages=session["messages"],
         )
         reply = response.choices[0].message.content or ""
     except Exception as e:
         print(f"OpenAI error: {e}")
         reply = "I am having trouble connecting. Please call 911 directly."
 
-    sessions[call_sid]["messages"].append({"role": "assistant", "content": reply})
+    session["messages"].append({"role": "assistant", "content": reply})
+    save_session(call_sid, session)
     return reply
 
 
 def get_session_meta(call_sid: str) -> dict[str, Any]:
-    return sessions[call_sid] if call_sid in sessions else {}  # noqa: SIM401
-
-
-def clear_session(call_sid: str) -> None:
-    sessions.pop(call_sid, None)
+    session = get_session(call_sid)
+    return {} if session is None else session  # noqa: SIM401
 
 
 if __name__ == "__main__":

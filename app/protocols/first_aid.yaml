@@ -94,6 +94,9 @@ poisoning:
     - If unconscious, place in recovery position and monitor breathing.
     - Collect the substance container or note the substance name to tell paramedics.
 
+drowning:
+electrical shock:
+
 default:
   steps:
     - Keep the person calm and still.
