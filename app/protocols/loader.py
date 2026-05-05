@@ -19,6 +19,8 @@ def get_first_aid_protocol(description: str) -> str:
 
     text = description.lower()
     for _condition, steps in _protocols.items():
+        if not steps:
+            continue
         if any(kw in text for kw in steps.get("keywords", [])):
             return "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps["steps"]))
 

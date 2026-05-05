@@ -95,7 +95,20 @@ poisoning:
     - Collect the substance container or note the substance name to tell paramedics.
 
 drowning:
+  keywords: [drowning, pulled from water, underwater, submerged]
+  steps:
+    - Call 911 immediately.
+    - If the person is unresponsive and not breathing, begin CPR.
+    - Do not move them if a spinal injury is possible.
+    - Keep them warm and still until paramedics arrive.
+
 electrical shock:
+  keywords: [electric shock, electrocuted, touched a wire, lightning]
+  steps:
+    - Do not touch the person until the power source is off.
+    - Call 911 immediately.
+    - If they are unresponsive and not breathing, begin CPR.
+    - Keep them still and warm until paramedics arrive.
 
 default:
   steps:
