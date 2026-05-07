@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import redis
@@ -64,11 +65,14 @@ def clear_session(call_sid):
     r.delete(call_sid)
 
 
-async def build_response(description: str, call_sid: str, country_code: str = "US") -> str:
+async def build_response(
+    description: str, call_sid: str, country_code: str = "US"
+) -> AsyncGenerator[str, None]:
     severity = triage_severity(description)
     emergency_number = get_emergency_number(country_code)
     protocol = get_first_aid_protocol(description)
-
+    buffer = ""
+    reply = ""
     if severity == Severity.CRITICAL:
         prefix = f"This is a {emergency_number} emergency. Call {emergency_number} right now. "
         prefix += "While you wait, here is what to do: "
@@ -108,17 +112,22 @@ async def build_response(description: str, call_sid: str, country_code: str = "U
 
     try:
         response = await client.chat.completions.create(
-            model="gpt-5.4-mini",
-            messages=session["messages"],
+            model="gpt-5.4-mini", messages=session["messages"], stream=True
         )
-        reply = response.choices[0].message.content or ""
+        async for chunk in response:
+            token = chunk.choices[0].delta.content or ""
+            buffer += token
+            reply += token
+            if buffer.endswith(("\n", ".", "!", "?")):
+                yield buffer.strip()
+                buffer = ""
     except Exception as e:
         print(f"OpenAI error: {e}")
         reply = "I am having trouble connecting. Please call 911 directly."
+        yield reply
 
     session["messages"].append({"role": "assistant", "content": reply})
     save_session(call_sid, session)
-    return reply
 
 
 def get_session_meta(call_sid: str) -> dict[str, Any]:
@@ -127,6 +136,7 @@ def get_session_meta(call_sid: str) -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    import asyncio
 
-    print(asyncio.run(build_response("my dad collapsed and isn't breathing", "test_123")))
+    async def main():
+        async for sentence in build_response("my dad collapsed and isn't breathing", "test_123"):
+            print(sentence)

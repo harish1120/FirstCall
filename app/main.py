@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import contextlib
 import json
 import os
 
@@ -114,23 +115,44 @@ async def stream(websocket: WebSocket):
 
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     call_sid: str | None = None
+    stop_speaking: asyncio.Event = asyncio.Event()
+    tts_task: asyncio.Task | None = None
 
-    async def on_transcript(text: str) -> None:
+    async def play_response(text: str) -> None:
         if call_sid is None:
             return
         try:
-            print(f"{country_code}")
-            response = await build_response(text, call_sid, country_code)
-            for chunk in text_to_speech_stream(response):
-                await websocket.send_text(
-                    json.dumps(
-                        {
-                            "event": "media",
-                            "streamSid": stream_sid,
-                            "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
-                        }
+            stop_speaking.clear()
+            async for sentence in build_response(text, call_sid, country_code):
+                for chunk in text_to_speech_stream(sentence):
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "event": "media",
+                                "streamSid": stream_sid,
+                                "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                            }
+                        )
                     )
-                )
+                    if stop_speaking.is_set():
+                        break
+                if stop_speaking.is_set():
+                    break
+        except asyncio.CancelledError:
+            await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
+            raise
+
+    async def on_transcript(text: str) -> None:
+        nonlocal tts_task
+        try:
+            print(f"{country_code}")
+            if tts_task and not tts_task.done():
+                stop_speaking.set()
+                tts_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await tts_task
+
+            tts_task = asyncio.create_task(play_response(text))
         except Exception as e:
             print(f"Error in on_transcript: {e}")
 

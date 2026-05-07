@@ -48,15 +48,22 @@ def test_clear_session_valid_callsid(store: dict) -> None:
 
 
 async def test_build_response_critical(store: dict) -> None:
-    mock_choice = MagicMock()
-    mock_choice.message.content = "Call 911 now!"
-    mock_response = MagicMock()
-    mock_response.choices = [mock_choice]
+    # mock_choice = MagicMock()
+    # mock_choice.message.content = "Call 911 now!"
+    # mock_response = MagicMock()
+    # mock_response.choices = [mock_choice]
+
+    async def mock_stream():
+        mock_chunk = MagicMock()
+        mock_chunk.choices[0].delta.content = "Call 911 now!"
+        yield mock_chunk
 
     with patch(
-        "app.agent.client.chat.completions.create", new=AsyncMock(return_value=mock_response)
+        "app.agent.client.chat.completions.create", new=AsyncMock(return_value=mock_stream())
     ):
-        result = await build_response("my neighbor is not breathing", "call_001")
+        result = "".join(
+            [chunk async for chunk in build_response("my neighbor is not breathing", "call_001")]
+        )
 
     meta = get_session_meta("call_001")
     assert result == "Call 911 now!"
