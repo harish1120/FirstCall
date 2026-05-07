@@ -155,6 +155,7 @@ async def stream(websocket: WebSocket):
                 tts_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await tts_task
+                return
 
             tts_task = asyncio.create_task(play_response(text))
         except Exception as e:
