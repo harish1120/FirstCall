@@ -125,21 +125,25 @@ async def stream(websocket: WebSocket):
             stop_speaking.clear()
             async for sentence in build_response(text, call_sid, country_code):
                 for chunk in text_to_speech_stream(sentence):
-                    await websocket.send_text(
-                        json.dumps(
-                            {
-                                "event": "media",
-                                "streamSid": stream_sid,
-                                "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
-                            }
+                    try:
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "event": "media",
+                                    "streamSid": stream_sid,
+                                    "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                                }
+                            )
                         )
-                    )
+                    except RuntimeError:
+                        return
                     if stop_speaking.is_set():
                         break
                 if stop_speaking.is_set():
                     break
         except asyncio.CancelledError:
-            await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
+            with contextlib.suppress(RuntimeError):
+                await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
             raise
 
     async def on_transcript(text: str) -> None:
@@ -171,5 +175,7 @@ async def stream(websocket: WebSocket):
             await audio_queue.put(audio)
         elif data["event"] == "stop":
             print("[WS] Stream stopped")
+            if tts_task and not tts_task.done():
+                tts_task.cancel()
             await audio_queue.put(None)
             break
