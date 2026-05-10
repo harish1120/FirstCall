@@ -6,7 +6,7 @@ from deepgram.core.events import EventType
 from deepgram.listen.v2.types import ListenV2CloseStream, ListenV2TurnInfo
 
 
-async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
+async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript, on_speech_start):
     deepgram = AsyncDeepgramClient(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     try:
@@ -40,6 +40,8 @@ async def transcribe_stream(audio_queue: asyncio.Queue, on_transcript):
                 print(
                     f"[STT] transcript={repr(transcript)} event={repr(event)} eot_conf={eot_confidence:.2f}"
                 )
+                if event == "StartOfTurn":
+                    await on_speech_start()
                 is_end_of_turn = event == "EndOfTurn"
                 is_high_confidence_final = event == "Update" and eot_confidence >= 0.5
                 if (
@@ -87,6 +89,9 @@ if __name__ == "__main__":
         await queue.put(b"\x00" * 320)
         await queue.put(None)
 
-        await transcribe_stream(queue, on_transcript)
+        async def on_speech_start():
+            pass
+
+        await transcribe_stream(queue, on_transcript, on_speech_start)
 
     asyncio.run(test())

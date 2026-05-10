@@ -21,6 +21,7 @@ load_dotenv()
 
 BASE_URL = os.getenv("BASE_URL", "")
 validator = RequestValidator(os.getenv("TWILIO_AUTH_TOKEN", ""))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 Base.metadata.create_all(bind=engine)
 limiter = Limiter(key_func=get_remote_address)
@@ -146,22 +147,28 @@ async def stream(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
             raise
 
+    async def on_speech_start() -> None:
+        nonlocal tts_task
+        if tts_task and not tts_task.done():
+            stop_speaking.set()
+            tts_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await tts_task
+            with contextlib.suppress(RuntimeError):
+                await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
+            print("[BARGE-IN] Caller interrupted, TTS cancelled")
+            return
+
     async def on_transcript(text: str) -> None:
         nonlocal tts_task
+        if call_sid is None:
+            return
         try:
-            print(f"{country_code}")
-            if tts_task and not tts_task.done():
-                stop_speaking.set()
-                tts_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await tts_task
-                return
-
             tts_task = asyncio.create_task(play_response(text))
         except Exception as e:
             print(f"Error in on_transcript: {e}")
 
-    asyncio.create_task(transcribe_stream(audio_queue, on_transcript))
+    asyncio.create_task(transcribe_stream(audio_queue, on_transcript, on_speech_start))
 
     async for message in websocket.iter_text():
         data = json.loads(message)
@@ -180,3 +187,37 @@ async def stream(websocket: WebSocket):
                 tts_task.cancel()
             await audio_queue.put(None)
             break
+
+
+#  @app.websocket("/stream")
+#   async def stream(websocket: WebSocket):
+#       await websocket.accept()
+
+#       stream_sid: str | None = None
+#       call_sid: str | None = None
+#       country_code: str = "US"
+
+#       async with websockets.connect(
+#           "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
+#           additional_headers={
+#               "Authorization": f"Bearer {OPENAI_API_KEY}",
+#               "OpenAI-Beta": "realtime=v1",
+#           },
+#       ) as openai_ws:
+
+#           # Configure the session
+#           await openai_ws.send(json.dumps({
+#               "type": "session.update",
+#               "session": {
+#                   "voice": "alloy",
+#                   "input_audio_format": "g711_ulaw",
+#                   "output_audio_format": "g711_ulaw",
+#                   "input_audio_transcription": {"model": "whisper-1"},
+#                   "turn_detection": {
+#                       "type": "server_vad",
+#                       "threshold": 0.5,
+#                       "silence_duration_ms": 800,
+#                   },
+#                   "instructions": SYSTEM_PROMPT,
+#               },
+#           }))
