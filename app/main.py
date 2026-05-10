@@ -129,7 +129,7 @@ async def stream(websocket: WebSocket):
                         "type": "session.update",
                         "session": {
                             "voice": "shimmer",
-                            "temperature": 0.6,
+                            "temperature": 0.3,
                             "input_audio_format": "g711_ulaw",
                             "output_audio_format": "g711_ulaw",
                             "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
@@ -154,6 +154,16 @@ async def stream(websocket: WebSocket):
                         call_sid = data["start"]["callSid"]
                         country_code = data["start"]["customParameters"].get("country", "US")
                         print(f"[WS] Stream started: call_sid={call_sid}")
+                        await openai_ws.send(
+                            json.dumps(
+                                {
+                                    "type": "response.create",
+                                    "response": {
+                                        "instructions": "Greet the caller. Say exactly: 'Hello, this is FirstCall. Please describe the emergency.' Nothing else."
+                                    },
+                                }
+                            )
+                        )
                     elif data["event"] == "media":
                         await openai_ws.send(
                             json.dumps(
@@ -195,13 +205,23 @@ async def stream(websocket: WebSocket):
                             protocol = get_first_aid_protocol(transcript)
                             print(f"[TRIAGE] severity={severity}")
 
-                            updated = (
-                                SYSTEM_PROMPT
-                                + "\nCurrent situation:\n"
-                                + f"- Severity: {severity}\n"
-                                + f"- Emergency number: {emergency_number}\n"
-                                + f"- Protocol: {protocol}\n"
+                            critical_override = (
+                                (
+                                    "\n\nCRITICAL OVERRIDE — THIS IS A LIFE-THREATENING EMERGENCY:\n"
+                                    f"- Severity is CRITICAL. Emergency number is {emergency_number}.\n"
+                                    f"- Your NEXT response must start with 'Call {emergency_number} right now.' No exceptions.\n"
+                                    f"- If the caller asks whether to call {emergency_number}, say YES immediately.\n"
+                                    f"- Protocol to follow after 911 is called: {protocol}\n"
+                                )
+                                if str(severity) == "CRITICAL"
+                                else (
+                                    f"\n\nCurrent situation:\n"
+                                    f"- Severity: {severity}\n"
+                                    f"- Emergency number: {emergency_number}\n"
+                                    f"- Protocol: {protocol}\n"
+                                )
                             )
+                            updated = SYSTEM_PROMPT + critical_override
                             await openai_ws.send(
                                 json.dumps(
                                     {
