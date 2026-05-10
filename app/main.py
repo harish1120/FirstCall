@@ -114,134 +114,138 @@ async def stream(websocket: WebSocket):
     country_code: str = "US"
     triage_done: bool = False
 
-    async with websockets.connect(
-        "wss://api.openai.com/v1/realtime?model=gpt-realtime",
-        additional_headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "OpenAI-Beta": "realtime=v1",
-        },
-    ) as openai_ws:
-        await openai_ws.send(
-            json.dumps(
-                {
-                    "type": "session.update",
-                    "session": {
-                        "voice": "ash",
-                        "temperature": 0.6,
-                        "input_audio_format": "g711_ulaw",
-                        "output_audio_format": "g711_ulaw",
-                        "input_audio_transcription": {"model": "gpt-4o-transcribe"},
-                        "turn_detection": {
-                            "type": "server_vad",
-                            "threshold": 0.25,
-                            "silence_duration_ms": 300,
-                            "prefix_padding_ms": 300,
+    print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
+    try:
+        async with websockets.connect(
+            "wss://api.openai.com/v1/realtime?model=gpt-realtime",
+            additional_headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "OpenAI-Beta": "realtime=v1",
+            },
+        ) as openai_ws:
+            await openai_ws.send(
+                json.dumps(
+                    {
+                        "type": "session.update",
+                        "session": {
+                            "voice": "ash",
+                            "temperature": 0.6,
+                            "input_audio_format": "g711_ulaw",
+                            "output_audio_format": "g711_ulaw",
+                            "input_audio_transcription": {"model": "gpt-4o-transcribe"},
+                            "turn_detection": {
+                                "type": "server_vad",
+                                "threshold": 0.25,
+                                "silence_duration_ms": 300,
+                                "prefix_padding_ms": 300,
+                            },
+                            "instructions": SYSTEM_PROMPT,
                         },
-                        "instructions": SYSTEM_PROMPT,
-                    },
-                }
+                    }
+                )
             )
-        )
 
-        async def twilio_to_openai() -> None:
-            nonlocal stream_sid, call_sid, country_code
-            async for message in websocket.iter_text():
-                data = json.loads(message)
-                if data["event"] == "start":
-                    stream_sid = data["start"]["streamSid"]
-                    call_sid = data["start"]["callSid"]
-                    country_code = data["start"]["customParameters"].get("country", "US")
-                    print(f"[WS] Stream started: call_sid={call_sid}")
-                elif data["event"] == "media":
-                    await openai_ws.send(
-                        json.dumps(
-                            {
-                                "type": "input_audio_buffer.append",
-                                "audio": data["media"]["payload"],
-                            }
-                        )
-                    )
-                elif data["event"] == "stop":
-                    print("[WS] Stream stopped")
-                    break
-
-        async def openai_to_twilio() -> None:
-            nonlocal triage_done
-            async for raw in openai_ws:
-                data = json.loads(raw)
-                event = data.get("type")
-
-                if event == "response.audio.delta" and stream_sid:
-                    await websocket.send_text(
-                        json.dumps(
-                            {
-                                "event": "media",
-                                "streamSid": stream_sid,
-                                "media": {"payload": data["delta"]},
-                            }
-                        )
-                    )
-
-                elif event == "conversation.item.input_audio_transcription.completed":
-                    transcript = data.get("transcript", "")
-                    print(f"[TRANSCRIPT] {transcript}")
-
-                    if not triage_done and transcript and call_sid:
-                        triage_done = True
-                        severity = triage_severity(transcript)
-                        emergency_number = get_emergency_number(country_code)
-                        protocol = get_first_aid_protocol(transcript)
-                        print(f"[TRIAGE] severity={severity}")
-
-                        updated = (
-                            SYSTEM_PROMPT
-                            + "\nCurrent situation:\n"
-                            + f"- Severity: {severity}\n"
-                            + f"- Emergency number: {emergency_number}\n"
-                            + f"- Protocol: {protocol}\n"
-                        )
+            async def twilio_to_openai() -> None:
+                nonlocal stream_sid, call_sid, country_code
+                async for message in websocket.iter_text():
+                    data = json.loads(message)
+                    if data["event"] == "start":
+                        stream_sid = data["start"]["streamSid"]
+                        call_sid = data["start"]["callSid"]
+                        country_code = data["start"]["customParameters"].get("country", "US")
+                        print(f"[WS] Stream started: call_sid={call_sid}")
+                    elif data["event"] == "media":
                         await openai_ws.send(
                             json.dumps(
                                 {
-                                    "type": "session.update",
-                                    "session": {"instructions": updated},
+                                    "type": "input_audio_buffer.append",
+                                    "audio": data["media"]["payload"],
                                 }
                             )
                         )
-                        save_session(
-                            call_sid,
-                            {
-                                "severity": severity,
-                                "condition": transcript,
-                                "messages": [],
-                            },
-                        )
+                    elif data["event"] == "stop":
+                        print("[WS] Stream stopped")
+                        break
 
-                elif event == "input_audio_buffer.speech_started":
-                    print("[BARGE-IN] Speech detected, clearing Twilio buffer")
-                    if stream_sid:
+            async def openai_to_twilio() -> None:
+                nonlocal triage_done
+                async for raw in openai_ws:
+                    data = json.loads(raw)
+                    event = data.get("type")
+
+                    if event == "response.audio.delta" and stream_sid:
                         await websocket.send_text(
                             json.dumps(
                                 {
-                                    "event": "clear",
+                                    "event": "media",
                                     "streamSid": stream_sid,
+                                    "media": {"payload": data["delta"]},
                                 }
                             )
                         )
 
-                elif event == "response.cancelled":
-                    print("[BARGE-IN] Response cancelled")
-                    if stream_sid:
-                        await websocket.send_text(
-                            json.dumps(
+                    elif event == "conversation.item.input_audio_transcription.completed":
+                        transcript = data.get("transcript", "")
+                        print(f"[TRANSCRIPT] {transcript}")
+
+                        if not triage_done and transcript and call_sid:
+                            triage_done = True
+                            severity = triage_severity(transcript)
+                            emergency_number = get_emergency_number(country_code)
+                            protocol = get_first_aid_protocol(transcript)
+                            print(f"[TRIAGE] severity={severity}")
+
+                            updated = (
+                                SYSTEM_PROMPT
+                                + "\nCurrent situation:\n"
+                                + f"- Severity: {severity}\n"
+                                + f"- Emergency number: {emergency_number}\n"
+                                + f"- Protocol: {protocol}\n"
+                            )
+                            await openai_ws.send(
+                                json.dumps(
+                                    {
+                                        "type": "session.update",
+                                        "session": {"instructions": updated},
+                                    }
+                                )
+                            )
+                            save_session(
+                                call_sid,
                                 {
-                                    "event": "clear",
-                                    "streamSid": stream_sid,
-                                }
+                                    "severity": severity,
+                                    "condition": transcript,
+                                    "messages": [],
+                                },
                             )
-                        )
 
-                elif event == "error":
-                    print(f"[OpenAI Error] {data}")
+                    elif event == "input_audio_buffer.speech_started":
+                        print("[BARGE-IN] Speech detected, clearing Twilio buffer")
+                        if stream_sid:
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "event": "clear",
+                                        "streamSid": stream_sid,
+                                    }
+                                )
+                            )
 
-        await asyncio.gather(twilio_to_openai(), openai_to_twilio())
+                    elif event == "response.cancelled":
+                        print("[BARGE-IN] Response cancelled")
+                        if stream_sid:
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "event": "clear",
+                                        "streamSid": stream_sid,
+                                    }
+                                )
+                            )
+
+                    elif event == "error":
+                        print(f"[OpenAI Error] {data}")
+
+            await asyncio.gather(twilio_to_openai(), openai_to_twilio())
+    except Exception as e:
+        print(f"[OpenAI] Connection failed: {e}")
