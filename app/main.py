@@ -1,13 +1,8 @@
 import asyncio
-import audioop
-import base64
-import contextlib
 import json
 import os
-from collections.abc import Callable
-from typing import Any, cast
 
-import webrtcvad
+import websockets
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request, WebSocket, status
 from fastapi.responses import Response, StreamingResponse
@@ -16,9 +11,10 @@ from slowapi.util import get_remote_address
 from twilio.request_validator import RequestValidator
 
 from app import models
-from app.agent import build_response, clear_session, get_session_meta
+from app.agent import SYSTEM_PROMPT, clear_session, get_session_meta, save_session
 from app.database import Base, engine, get_db
-from app.stt import transcribe_stream
+from app.protocols.loader import get_first_aid_protocol
+from app.triage import get_emergency_number, triage_severity
 from app.tts import intro_speech, text_to_speech_stream
 
 load_dotenv()
@@ -47,10 +43,6 @@ async def health():
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
-    # signature = request.headers.get("X-Twilio-Signature", "")
-    # url = str(request.url)
-    # if not validator.validate(url, dict(form), signature):
-    #     return Response(status_code=403)
     country = form.get("FromCountry", "US")
     ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -84,7 +76,6 @@ async def audio_stream(call_sid: str):
 @app.post("/handle-recording")
 async def handle_recording(request: Request):
     """Receives the recorded audio URL from Twilio after the caller speaks."""
-    # TODO: pipe audio through Deepgram STT, then Claude agent
     twiml = """<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Say>Thank you. Processing your request.</Say>
@@ -117,132 +108,114 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
 @app.websocket("/stream")
 async def stream(websocket: WebSocket):
     await websocket.accept()
-    vad = webrtcvad.Vad()
-    vad.set_mode(3)
-    vad_buffer = bytearray()
-    speech_detected = False
 
-    audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    stream_sid: str | None = None
     call_sid: str | None = None
-    stop_speaking: asyncio.Event = asyncio.Event()
-    tts_task: asyncio.Task | None = None
+    country_code: str = "US"
+    triage_done: bool = False
 
-    async def play_response(text: str) -> None:
-        if call_sid is None:
-            return
-        try:
-            stop_speaking.clear()
-            async for sentence in build_response(text, call_sid, country_code):
-                chunks = await asyncio.to_thread(
-                    cast(Callable[[], list[Any]], lambda s=sentence: list(text_to_speech_stream(s)))
-                )
-                for chunk in chunks:
-                    try:
-                        await websocket.send_text(
+    async with websockets.connect(
+        "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
+        additional_headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "OpenAI-Beta": "realtime=v1",
+        },
+    ) as openai_ws:
+        await openai_ws.send(
+            json.dumps(
+                {
+                    "type": "session.update",
+                    "session": {
+                        "voice": "alloy",
+                        "input_audio_format": "g711_ulaw",
+                        "output_audio_format": "g711_ulaw",
+                        "input_audio_transcription": {"model": "whisper-1"},
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "threshold": 0.5,
+                            "silence_duration_ms": 800,
+                        },
+                        "instructions": SYSTEM_PROMPT,
+                    },
+                }
+            )
+        )
+
+        async def twilio_to_openai() -> None:
+            nonlocal stream_sid, call_sid, country_code
+            async for message in websocket.iter_text():
+                data = json.loads(message)
+                if data["event"] == "start":
+                    stream_sid = data["start"]["streamSid"]
+                    call_sid = data["start"]["callSid"]
+                    country_code = data["start"]["customParameters"].get("country", "US")
+                    print(f"[WS] Stream started: call_sid={call_sid}")
+                elif data["event"] == "media":
+                    await openai_ws.send(
+                        json.dumps(
+                            {
+                                "type": "input_audio_buffer.append",
+                                "audio": data["media"]["payload"],
+                            }
+                        )
+                    )
+                elif data["event"] == "stop":
+                    print("[WS] Stream stopped")
+                    break
+
+        async def openai_to_twilio() -> None:
+            nonlocal triage_done
+            async for raw in openai_ws:
+                data = json.loads(raw)
+                event = data.get("type")
+
+                if event == "response.audio.delta" and stream_sid:
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "event": "media",
+                                "streamSid": stream_sid,
+                                "media": {"payload": data["delta"]},
+                            }
+                        )
+                    )
+
+                elif event == "conversation.item.input_audio_transcription.completed":
+                    transcript = data.get("transcript", "")
+                    print(f"[TRANSCRIPT] {transcript}")
+
+                    if not triage_done and transcript and call_sid:
+                        triage_done = True
+                        severity = triage_severity(transcript)
+                        emergency_number = get_emergency_number(country_code)
+                        protocol = get_first_aid_protocol(transcript)
+                        print(f"[TRIAGE] severity={severity}")
+
+                        updated = (
+                            SYSTEM_PROMPT
+                            + "\nCurrent situation:\n"
+                            + f"- Severity: {severity}\n"
+                            + f"- Emergency number: {emergency_number}\n"
+                            + f"- Protocol: {protocol}\n"
+                        )
+                        await openai_ws.send(
                             json.dumps(
                                 {
-                                    "event": "media",
-                                    "streamSid": stream_sid,
-                                    "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                                    "type": "session.update",
+                                    "session": {"instructions": updated},
                                 }
                             )
                         )
-                    except RuntimeError:
-                        return
-                    if stop_speaking.is_set():
-                        break
-                if stop_speaking.is_set():
-                    break
-        except asyncio.CancelledError:
-            with contextlib.suppress(RuntimeError):
-                await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
-            raise
+                        save_session(
+                            call_sid,
+                            {
+                                "severity": severity,
+                                "condition": transcript,
+                                "messages": [],
+                            },
+                        )
 
-    async def on_speech_start() -> None:
-        nonlocal tts_task
-        if tts_task and not tts_task.done():
-            stop_speaking.set()
-            tts_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await tts_task
-            with contextlib.suppress(RuntimeError):
-                await websocket.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))
-            print("[BARGE-IN] Caller interrupted, TTS cancelled")
-            return
+                elif event == "error":
+                    print(f"[OpenAI Error] {data}")
 
-    async def on_transcript(text: str) -> None:
-        nonlocal tts_task
-        if call_sid is None:
-            return
-        try:
-            tts_task = asyncio.create_task(play_response(text))
-        except Exception as e:
-            print(f"Error in on_transcript: {e}")
-
-    asyncio.create_task(transcribe_stream(audio_queue, on_transcript, on_speech_start))
-
-    async for message in websocket.iter_text():
-        data = json.loads(message)
-
-        if data["event"] == "start":
-            call_sid = data["start"]["callSid"]
-            stream_sid = data["start"]["streamSid"]
-            country_code = data["start"]["customParameters"].get("country", "US")
-            print(f"[WS] Stream started: call_sid={call_sid}")
-
-        elif data["event"] == "media":
-            audio = base64.b64decode(data["media"]["payload"])
-            pcm = audioop.ulaw2lin(audio, 2)
-            vad_buffer.extend(pcm)
-
-            while len(vad_buffer) >= 320:
-                frame = bytes(vad_buffer[:320])
-                vad_buffer = vad_buffer[320:]
-                if vad.is_speech(frame, 8000):
-                    if not speech_detected:
-                        speech_detected = True
-                        await on_speech_start()
-                else:
-                    speech_detected = False
-            await audio_queue.put(audio)
-
-        elif data["event"] == "stop":
-            print("[WS] Stream stopped")
-            if tts_task and not tts_task.done():
-                tts_task.cancel()
-            await audio_queue.put(None)
-            break
-
-
-#  @app.websocket("/stream")
-#   async def stream(websocket: WebSocket):
-#       await websocket.accept()
-
-#       stream_sid: str | None = None
-#       call_sid: str | None = None
-#       country_code: str = "US"
-
-#       async with websockets.connect(
-#           "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
-#           additional_headers={
-#               "Authorization": f"Bearer {OPENAI_API_KEY}",
-#               "OpenAI-Beta": "realtime=v1",
-#           },
-#       ) as openai_ws:
-
-#           # Configure the session
-#           await openai_ws.send(json.dumps({
-#               "type": "session.update",
-#               "session": {
-#                   "voice": "alloy",
-#                   "input_audio_format": "g711_ulaw",
-#                   "output_audio_format": "g711_ulaw",
-#                   "input_audio_transcription": {"model": "whisper-1"},
-#                   "turn_detection": {
-#                       "type": "server_vad",
-#                       "threshold": 0.5,
-#                       "silence_duration_ms": 800,
-#                   },
-#                   "instructions": SYSTEM_PROMPT,
-#               },
-#           }))
+        await asyncio.gather(twilio_to_openai(), openai_to_twilio())
