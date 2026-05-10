@@ -126,14 +126,16 @@ async def stream(websocket: WebSocket):
                 {
                     "type": "session.update",
                     "session": {
-                        "voice": "alloy",
+                        "voice": "ash",
+                        "temperature": 0.6,
                         "input_audio_format": "g711_ulaw",
                         "output_audio_format": "g711_ulaw",
                         "input_audio_transcription": {"model": "gpt-4o-transcribe"},
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.4,
-                            "silence_duration_ms": 400,
+                            "threshold": 0.25,
+                            "silence_duration_ms": 300,
+                            "prefix_padding_ms": 300,
                         },
                         "instructions": SYSTEM_PROMPT,
                     },
