@@ -31,6 +31,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "if [ ! -d /home/ubuntu/FirstCall ]; then git clone https://github.com/harish1120/FirstCall.git /home/ubuntu/FirstCall; fi",
+              "git config --global --add safe.directory /home/ubuntu/FirstCall",
               "cd /home/ubuntu/FirstCall && git pull origin main",
               "echo APP_ENV=${{ secrets.APP_ENV }} > /home/ubuntu/FirstCall/.env",
               "echo BASE_URL=${{ secrets.BASE_URL }} >> /home/ubuntu/FirstCall/.env",
