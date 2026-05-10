@@ -4,6 +4,8 @@ import base64
 import contextlib
 import json
 import os
+from collections.abc import Callable
+from typing import Any, cast
 
 import webrtcvad
 from dotenv import load_dotenv
@@ -131,7 +133,10 @@ async def stream(websocket: WebSocket):
         try:
             stop_speaking.clear()
             async for sentence in build_response(text, call_sid, country_code):
-                for chunk in text_to_speech_stream(sentence):
+                chunks = await asyncio.to_thread(
+                    cast(Callable[[], list[Any]], lambda s=sentence: list(text_to_speech_stream(s)))
+                )
+                for chunk in chunks:
                     try:
                         await websocket.send_text(
                             json.dumps(
