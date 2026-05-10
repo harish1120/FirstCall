@@ -132,7 +132,7 @@ async def stream(websocket: WebSocket):
                             "temperature": 0.6,
                             "input_audio_format": "g711_ulaw",
                             "output_audio_format": "g711_ulaw",
-                            "input_audio_transcription": {"model": "gpt-4o-mini-tts"},
+                            "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
                             "turn_detection": {
                                 "type": "server_vad",
                                 "threshold": 0.4,
