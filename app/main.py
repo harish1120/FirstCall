@@ -215,6 +215,30 @@ async def stream(websocket: WebSocket):
                             },
                         )
 
+                elif event == "input_audio_buffer.speech_started":
+                    print("[BARGE-IN] Speech detected, clearing Twilio buffer")
+                    if stream_sid:
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "event": "clear",
+                                    "streamSid": stream_sid,
+                                }
+                            )
+                        )
+
+                elif event == "response.cancelled":
+                    print("[BARGE-IN] Response cancelled")
+                    if stream_sid:
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "event": "clear",
+                                    "streamSid": stream_sid,
+                                }
+                            )
+                        )
+
                 elif event == "error":
                     print(f"[OpenAI Error] {data}")
 
