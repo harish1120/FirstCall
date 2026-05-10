@@ -148,8 +148,7 @@ async def stream(websocket: WebSocket):
                 if data["event"] == "start":
                     stream_sid = data["start"]["streamSid"]
                     call_sid = data["start"]["callSid"]
-                    country_code = data["start"]["customParameters"].get(
-                        "country", "US")
+                    country_code = data["start"]["customParameters"].get("country", "US")
                     print(f"[WS] Stream started: call_sid={call_sid}")
                 elif data["event"] == "media":
                     await openai_ws.send(
