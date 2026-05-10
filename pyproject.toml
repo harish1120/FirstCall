@@ -20,6 +20,7 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "slowapi>=0.1.9",
     "redis>=7.4.0",
+    "webrtcvad>=2.0.10",
 ]
 
 [dependency-groups]

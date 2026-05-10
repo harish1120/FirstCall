@@ -1,9 +1,11 @@
 import asyncio
+import audioop
 import base64
 import contextlib
 import json
 import os
 
+import webrtcvad
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request, WebSocket, status
 from fastapi.responses import Response, StreamingResponse
@@ -113,6 +115,10 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
 @app.websocket("/stream")
 async def stream(websocket: WebSocket):
     await websocket.accept()
+    vad = webrtcvad.Vad()
+    vad.set_mode(3)
+    vad_buffer = bytearray()
+    speech_detected = False
 
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     call_sid: str | None = None
@@ -178,9 +184,23 @@ async def stream(websocket: WebSocket):
             stream_sid = data["start"]["streamSid"]
             country_code = data["start"]["customParameters"].get("country", "US")
             print(f"[WS] Stream started: call_sid={call_sid}")
+
         elif data["event"] == "media":
             audio = base64.b64decode(data["media"]["payload"])
+            pcm = audioop.ulaw2lin(audio, 2)
+            vad_buffer.extend(pcm)
+
+            while len(vad_buffer) >= 320:
+                frame = bytes(vad_buffer[:320])
+                vad_buffer = vad_buffer[320:]
+                if vad.is_speech(frame, 8000):
+                    if not speech_detected:
+                        speech_detected = True
+                        await on_speech_start()
+                else:
+                    speech_detected = False
             await audio_queue.put(audio)
+
         elif data["event"] == "stop":
             print("[WS] Stream stopped")
             if tts_task and not tts_task.done():
