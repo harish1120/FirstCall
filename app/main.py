@@ -115,7 +115,7 @@ async def stream(websocket: WebSocket):
     triage_done: bool = False
 
     async with websockets.connect(
-        "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
+        "wss://api.openai.com/v1/realtime?model=gpt-realtime",
         additional_headers={
             "Authorization": f"Bearer {OPENAI_API_KEY}",
             "OpenAI-Beta": "realtime=v1",
@@ -129,11 +129,11 @@ async def stream(websocket: WebSocket):
                         "voice": "alloy",
                         "input_audio_format": "g711_ulaw",
                         "output_audio_format": "g711_ulaw",
-                        "input_audio_transcription": {"model": "whisper-1"},
+                        "input_audio_transcription": {"model": "gpt-4o-transcribe"},
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.5,
-                            "silence_duration_ms": 800,
+                            "threshold": 0.4,
+                            "silence_duration_ms": 400,
                         },
                         "instructions": SYSTEM_PROMPT,
                     },
@@ -148,7 +148,8 @@ async def stream(websocket: WebSocket):
                 if data["event"] == "start":
                     stream_sid = data["start"]["streamSid"]
                     call_sid = data["start"]["callSid"]
-                    country_code = data["start"]["customParameters"].get("country", "US")
+                    country_code = data["start"]["customParameters"].get(
+                        "country", "US")
                     print(f"[WS] Stream started: call_sid={call_sid}")
                 elif data["event"] == "media":
                     await openai_ws.send(
