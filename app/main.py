@@ -47,7 +47,6 @@ async def handle_call(request: Request):
     ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Play>{BASE_URL}/play-intro</Play>
         <Connect>
             <Stream url="{ws_url}/stream">
                 <Parameter name="country" value="{country}"/>
@@ -129,7 +128,7 @@ async def stream(websocket: WebSocket):
                         "type": "session.update",
                         "session": {
                             "voice": "shimmer",
-                            "temperature": 0.3,
+                            "temperature": 0.6,
                             "input_audio_format": "g711_ulaw",
                             "output_audio_format": "g711_ulaw",
                             "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
