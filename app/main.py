@@ -39,7 +39,7 @@ async def health():
 
 
 @app.post("/voice")
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
