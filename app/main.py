@@ -11,10 +11,15 @@ from slowapi.util import get_remote_address
 from twilio.request_validator import RequestValidator
 
 from app import models
-from app.agent import SYSTEM_PROMPT, clear_session, get_session_meta, save_session
+from app.agent import (
+    SYSTEM_PROMPT,
+    clear_session,
+    extract_call_state,
+    generate_call_summary,
+    get_session_meta,
+    save_session,
+)
 from app.database import Base, engine, get_db
-from app.protocols.loader import get_first_aid_protocol
-from app.triage import get_emergency_number, triage_severity
 from app.tts import intro_speech, text_to_speech_stream
 
 load_dotenv()
@@ -97,6 +102,9 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
         duration_seconds=int(duration_seconds),
         severity=session_meta["severity"],
         condition=session_meta["condition"],
+        summary=session_meta.get("summary"),
+        steps_completed=session_meta.get("steps_completed"),
+        called_911=session_meta.get("called_911"),
     )
     db.add(call_log)
     db.commit()
@@ -105,9 +113,12 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
 
 
 @app.websocket("/stream")
-async def stream(websocket: WebSocket):
+async def stream(
+    websocket: WebSocket,
+):
     await websocket.accept()
 
+    conversation_history: list[str] = []
     stream_sid: str | None = None
     call_sid: str | None = None
     country_code: str = "US"
@@ -174,6 +185,25 @@ async def stream(websocket: WebSocket):
                         )
                     elif data["event"] == "stop":
                         print("[WS] Stream stopped")
+                        if conversation_history and call_sid:
+                            try:
+                                summary = await generate_call_summary(
+                                    conversation_history, country_code
+                                )
+                                print(f"[SUMMARY] {summary.summary}")
+                                save_session(
+                                    call_sid,
+                                    {
+                                        "severity": summary.condition,
+                                        "condition": summary.condition,
+                                        "summary": summary.summary,
+                                        "steps_completed": summary.steps_completed,
+                                        "key_actions_taken": summary.key_actions_taken,
+                                        "called_911": summary.called_911,
+                                    },
+                                )
+                            except Exception as e:
+                                print(f"[SUMMARY] Error:{e}")
                         break
 
             async def openai_to_twilio() -> None:
@@ -197,46 +227,38 @@ async def stream(websocket: WebSocket):
                         transcript = data.get("transcript", "")
                         print(f"[TRANSCRIPT] {transcript}")
 
-                        if not triage_done and transcript and call_sid:
-                            triage_done = True
-                            severity = triage_severity(transcript)
-                            emergency_number = get_emergency_number(country_code)
-                            protocol = get_first_aid_protocol(transcript)
-                            print(f"[TRIAGE] severity={severity}")
+                        if transcript and call_sid:
+                            try:
+                                state = await extract_call_state(
+                                    transcript, conversation_history, country_code
+                                )
+                                print(
+                                    f"[PROTOCOL AGENT] step={state.protocol_step} severity={state.severity} confirmed={state.caller_confirmed}"
+                                )
+                                await openai_ws.send(
+                                    json.dumps(
+                                        {
+                                            "type": "session.update",
+                                            "session": {
+                                                "instructions": SYSTEM_PROMPT
+                                                + f"""
+                                        Current call state:                                                                                                                                                                                                         
+                                            - Severity: {state.severity}                                                                                                                                                                                                
+                                            - Condition: {state.condition}                                                                                                                                                                                              
+                                            - Protocol step: {state.protocol_step}                                                                                                                                                                                      
+                                            - Caller confirmed last action: {state.caller_confirmed}
+                                            - Next instruction: {state.next_instruction}                                                                                                                                                                                
+                                            - Needs 911: {state.needs_911}
+                                            - Protocol complete: {state.protocol_complete}  
+                                        """
+                                            },
+                                        }
+                                    )
+                                )
+                            except Exception as e:
+                                print(f"[PROTOCOL AGENT] Error: {e}")
 
-                            critical_override = (
-                                (
-                                    "\n\nCRITICAL OVERRIDE — THIS IS A LIFE-THREATENING EMERGENCY:\n"
-                                    f"- Severity is CRITICAL. Emergency number is {emergency_number}.\n"
-                                    f"- Your NEXT response must start with 'Call {emergency_number} right now.' No exceptions.\n"
-                                    f"- If the caller asks whether to call {emergency_number}, say YES immediately.\n"
-                                    f"- Protocol to follow after 911 is called: {protocol}\n"
-                                )
-                                if str(severity) == "CRITICAL"
-                                else (
-                                    f"\n\nCurrent situation:\n"
-                                    f"- Severity: {severity}\n"
-                                    f"- Emergency number: {emergency_number}\n"
-                                    f"- Protocol: {protocol}\n"
-                                )
-                            )
-                            updated = SYSTEM_PROMPT + critical_override
-                            await openai_ws.send(
-                                json.dumps(
-                                    {
-                                        "type": "session.update",
-                                        "session": {"instructions": updated},
-                                    }
-                                )
-                            )
-                            save_session(
-                                call_sid,
-                                {
-                                    "severity": severity,
-                                    "condition": transcript,
-                                    "messages": [],
-                                },
-                            )
+                            conversation_history.append(transcript)
 
                     elif event == "input_audio_buffer.speech_started":
                         print("[BARGE-IN] Speech detected, clearing Twilio buffer")

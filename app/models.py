@@ -16,6 +16,9 @@ class CallLog(Base):
     severity: Any = Column(Enum(Severity), nullable=False)
     condition = Column(String, nullable=False)
     duration_seconds = Column(Integer, nullable=False, server_default=text("0"))
+    summary = Column(String, nullable=True)
+    steps_completed = Column(Integer, nullable=True)
+    called_911 = Column(Integer, nullable=True)
     created_at = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP")
     )
