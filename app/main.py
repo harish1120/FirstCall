@@ -130,17 +130,23 @@ async def stream(
                         "type": "session.update",
                         "session": {
                             "type": "realtime",
-                            "voice": "shimmer",
-                            "input_audio_format": "g711_ulaw",
-                            "output_audio_format": "g711_ulaw",
-                            "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
-                            "turn_detection": {
-                                "type": "server_vad",
-                                "threshold": 0.6,
-                                "silence_duration_ms": 400,
-                                "prefix_padding_ms": 300,
-                            },
                             "instructions": SYSTEM_PROMPT,
+                            "audio": {
+                                "input": {
+                                    "format": {"type": "g711_ulaw"},
+                                    "transcription": {"model": "gpt-4o-mini-transcribe"},
+                                    "turn_detection": {
+                                        "type": "server_vad",
+                                        "threshold": 0.6,
+                                        "silence_duration_ms": 400,
+                                        "prefix_padding_ms": 300,
+                                    },
+                                },
+                                "output": {
+                                    "format": {"type": "g711_ulaw"},
+                                    "voice": "shimmer",
+                                },
+                            },
                         },
                     }
                 )
