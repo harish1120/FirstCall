@@ -204,7 +204,7 @@ async def stream(
                     data = json.loads(raw)
                     event = data.get("type")
 
-                    if event == "response.audio.delta" and stream_sid:
+                    if event == "response.output_audio.delta" and stream_sid:
                         await websocket.send_text(
                             json.dumps(
                                 {
