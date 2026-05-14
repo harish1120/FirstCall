@@ -1,11 +1,12 @@
 import json
 import os
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Literal
 
 import redis
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from app.protocols.loader import get_first_aid_protocol
 from app.triage import Severity, get_emergency_number, triage_severity
@@ -19,7 +20,91 @@ r = redis.Redis(
     host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0, ssl=_redis_ssl, ssl_cert_reqs="none"
 )
 
-# sessions: dict[str, Any] = {}
+
+class CallState(BaseModel):
+    severity: Literal["ROUTINE", "URGENT", "CRITICAL"]
+    condition: str
+    protocol_step: int
+    caller_confirmed: bool
+    next_instruction: str
+    needs_911: bool
+    protocol_complete: bool
+
+
+class CallSummary(BaseModel):
+    condition: str
+    steps_completed: int
+    key_actions_taken: list[str]
+    called_911: bool
+    summary: str
+
+
+async def extract_call_state(
+    transcript: str, conversation_history: list[str], country_code: str = "US"
+) -> CallState:
+
+    severity = triage_severity(transcript)
+    protocol = get_first_aid_protocol(transcript)
+    emergency_number = get_emergency_number(country_code)
+    history_text = "\n".join(conversation_history) if conversation_history else "No history yet."
+
+    response = await client.beta.chat.completions.parse(
+        model="gpt-5.4-nano-2026-03-17",
+        messages=[
+            {
+                "role": "system",
+                "content": """You are a medical call state extractor.                                                                                                                                        
+                Given a conversation transcript and a first aid protocol, extract the current state.
+                Be precise and clinical. Determine which protocol step the caller is on based on the conversation history.
+                Never add conversational language.""",
+            },
+            {
+                "role": "user",
+                "content": f"""                                                                                                                                                                                
+                Transcript: {transcript}
+                Conversation so far: {history_text}                                                                                                                                                                                         
+                Severity: {severity}
+                Emergency number: {emergency_number}                                                                                                                                                                                        
+                Protocol: {protocol}                    
+                """,
+            },
+        ],
+        response_format=CallState,
+    )
+    result = response.choices[0].message.parsed
+    if result is None:
+        raise ValueError("Protocol agent failed to extract call state")
+    return result
+
+
+async def generate_call_summary(
+    conversation_history: list[str], country_code: str = "US"
+) -> CallSummary:
+    response = await client.beta.chat.completions.parse(
+        model="gpt-5.4-nano-2026-03-17",
+        messages=[
+            {
+                "role": "system",
+                "content": """You are a medical call summarizer. Given a complete emergency call transcript, extract a concise structured summary, do not include any personal details this is very important. 
+                Focus on what actions were taken and what the responders need to know on arrival.""",
+            },
+            {
+                "role": "user",
+                "content": f"""
+                Conversation so far: {conversation_history},
+                country code: {country_code}""",
+            },
+        ],
+        response_format=CallSummary,
+    )
+
+    result = response.choices[0].message.parsed
+
+    if result is None:
+        raise ValueError("Summarizer Agent Failed")
+
+    return result
+
 
 SYSTEM_PROMPT = """You are FirstCall, a calm and clear emergency first aid assistant.
 You are on a live phone call with someone in a medical emergency.
