@@ -13,6 +13,7 @@ from twilio.request_validator import RequestValidator
 from app import models
 from app.agent import (
     SYSTEM_PROMPT,
+    CallState,
     clear_session,
     extract_call_state,
     generate_call_summary,
@@ -115,6 +116,7 @@ async def stream(
     call_sid: str | None = None
     country_code: str = "US"
     triage_done: bool = False
+    last_state: CallState | None = None
 
     print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
     try:
@@ -182,6 +184,18 @@ async def stream(
                         )
                     elif data["event"] == "stop":
                         print("[WS] Stream stopped")
+                        if call_sid and last_state:
+                            save_session(
+                                call_sid,
+                                {
+                                    "severity": last_state.severity,
+                                    "condition": last_state.condition,
+                                    "summary": None,
+                                    "steps_completed": last_state.protocol_step,
+                                    "key_actions_taken": [],
+                                    "called_911": last_state.needs_911,
+                                },
+                            )
                         if conversation_history and call_sid:
                             try:
                                 summary = await generate_call_summary(
@@ -204,7 +218,7 @@ async def stream(
                         break
 
             async def openai_to_twilio() -> None:
-                nonlocal triage_done
+                nonlocal triage_done, last_state
                 async for raw in openai_ws:
                     data = json.loads(raw)
                     event = data.get("type")
@@ -229,6 +243,7 @@ async def stream(
                                 state = await extract_call_state(
                                     transcript, conversation_history, country_code
                                 )
+                                last_state = state
                                 print(
                                     f"[PROTOCOL AGENT] step={state.protocol_step} severity={state.severity} confirmed={state.caller_confirmed}"
                                 )
