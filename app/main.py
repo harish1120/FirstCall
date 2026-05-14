@@ -130,7 +130,6 @@ async def stream(
             "wss://api.openai.com/v1/realtime?model=gpt-realtime",
             additional_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "realtime=v1",
             },
         ) as openai_ws:
             await openai_ws.send(
