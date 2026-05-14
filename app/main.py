@@ -20,7 +20,7 @@ from app.agent import (
     save_session,
 )
 from app.database import Base, engine, get_db
-from app.tts import intro_speech, text_to_speech_stream
+from app.tts import text_to_speech_stream
 
 load_dotenv()
 
@@ -59,14 +59,6 @@ async def handle_call(request: Request):
         </Connect>
     </Response>"""
     return Response(content=twiml, media_type="application/xml")
-
-
-@app.get("/play-intro")
-async def play_intro():
-    text = "Hello, this is FirstCall. Please describe the emergency!"
-    if not text:
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
-    return StreamingResponse(intro_speech(text), media_type="audio/mpeg")
 
 
 @app.get("/audio/{call_sid}")
@@ -127,9 +119,10 @@ async def stream(
     print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
     try:
         async with websockets.connect(
-            "wss://api.openai.com/v1/realtime?model=gpt-realtime",
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
             additional_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "OpenAI-Beta": "realtime=v1",
             },
         ) as openai_ws:
             await openai_ws.send(
