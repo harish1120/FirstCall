@@ -194,7 +194,7 @@ async def stream(
                                 save_session(
                                     call_sid,
                                     {
-                                        "severity": summary.condition,
+                                        "severity": summary.severity,
                                         "condition": summary.condition,
                                         "summary": summary.summary,
                                         "steps_completed": summary.steps_completed,

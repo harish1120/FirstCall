@@ -32,6 +32,7 @@ class CallState(BaseModel):
 
 
 class CallSummary(BaseModel):
+    severity: Literal["ROUTINE", "URGENT", "CRITICAL"]
     condition: str
     steps_completed: int
     key_actions_taken: list[str]
