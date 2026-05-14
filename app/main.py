@@ -119,10 +119,9 @@ async def stream(
     print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
     try:
         async with websockets.connect(
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
+            "wss://api.openai.com/v1/realtime?model=gpt-realtime-2",
             additional_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "realtime=v1",
             },
         ) as openai_ws:
             await openai_ws.send(
@@ -130,6 +129,7 @@ async def stream(
                     {
                         "type": "session.update",
                         "session": {
+                            "type": "realtime",
                             "voice": "shimmer",
                             "temperature": 0.6,
                             "input_audio_format": "g711_ulaw",
