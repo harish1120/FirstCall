@@ -115,7 +115,6 @@ async def stream(
     stream_sid: str | None = None
     call_sid: str | None = None
     country_code: str = "US"
-    triage_done: bool = False
     last_state: CallState | None = None
 
     print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
@@ -218,7 +217,7 @@ async def stream(
                         break
 
             async def openai_to_twilio() -> None:
-                nonlocal triage_done, last_state
+                nonlocal last_state
                 async for raw in openai_ws:
                     data = json.loads(raw)
                     event = data.get("type")
@@ -241,28 +240,29 @@ async def stream(
                         if transcript and call_sid:
                             try:
                                 state = await extract_call_state(
-                                    transcript, conversation_history, country_code
+                                    transcript, conversation_history, country_code, last_state
                                 )
                                 last_state = state
                                 print(
                                     f"[PROTOCOL AGENT] step={state.protocol_step} severity={state.severity} confirmed={state.caller_confirmed}"
+                                )
+                                call_state_block = (
+                                    f"\n\n--- CURRENT CALL STATE (from Protocol Agent) ---"
+                                    f"\nSeverity: {state.severity}"
+                                    f"\nCondition: {state.condition}"
+                                    f"\nProtocol step: {state.protocol_step}"
+                                    f"\nCaller confirmed last action: {state.caller_confirmed}"
+                                    f"\nNeeds 911: {state.needs_911}"
+                                    f"\nProtocol complete: {state.protocol_complete}"
+                                    f"\n\nSAY THIS NEXT: {state.next_instruction}"
+                                    f"\n--- END CALL STATE ---"
                                 )
                                 await openai_ws.send(
                                     json.dumps(
                                         {
                                             "type": "session.update",
                                             "session": {
-                                                "instructions": SYSTEM_PROMPT
-                                                + f"""
-                                        Current call state:                                                                                                                                                                                                         
-                                            - Severity: {state.severity}                                                                                                                                                                                                
-                                            - Condition: {state.condition}                                                                                                                                                                                              
-                                            - Protocol step: {state.protocol_step}                                                                                                                                                                                      
-                                            - Caller confirmed last action: {state.caller_confirmed}
-                                            - Next instruction: {state.next_instruction}                                                                                                                                                                                
-                                            - Needs 911: {state.needs_911}
-                                            - Protocol complete: {state.protocol_complete}  
-                                        """
+                                                "instructions": SYSTEM_PROMPT + call_state_block,
                                             },
                                         }
                                     )

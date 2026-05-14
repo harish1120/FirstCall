@@ -41,33 +41,46 @@ class CallSummary(BaseModel):
 
 
 async def extract_call_state(
-    transcript: str, conversation_history: list[str], country_code: str = "US"
-) -> CallState:
-
-    severity = triage_severity(transcript)
-    protocol = get_first_aid_protocol(transcript)
+    transcript: str,
+    conversation_history: list[str],
+    country_code: str = "US",
+    last_state: "CallState | None" = None,
+) -> "CallState":
+    full_text = " ".join(conversation_history) + " " + transcript
+    severity = triage_severity(full_text) if not last_state else last_state.severity
+    protocol = get_first_aid_protocol(full_text)
     emergency_number = get_emergency_number(country_code)
     history_text = "\n".join(conversation_history) if conversation_history else "No history yet."
+
+    prior_state = ""
+    if last_state:
+        prior_state = (
+            f"\nPrevious state: step={last_state.protocol_step}, "
+            f"condition={last_state.condition}, confirmed={last_state.caller_confirmed}"
+        )
 
     response = await client.beta.chat.completions.parse(
         model="gpt-5.4-nano-2026-03-17",
         messages=[
             {
                 "role": "system",
-                "content": """You are a medical call state extractor.                                                                                                                                        
-                Given a conversation transcript and a first aid protocol, extract the current state.
-                Be precise and clinical. Determine which protocol step the caller is on based on the conversation history.
-                Never add conversational language.""",
+                "content": (
+                    "You are a medical call state extractor. "
+                    "Given a transcript, conversation history, and first aid protocol, extract the current state. "
+                    "Use the previous state to determine step progression — only advance the step if the caller confirmed the previous action. "
+                    "Be precise and clinical. Never add conversational language."
+                ),
             },
             {
                 "role": "user",
-                "content": f"""                                                                                                                                                                                
-                Transcript: {transcript}
-                Conversation so far: {history_text}                                                                                                                                                                                         
-                Severity: {severity}
-                Emergency number: {emergency_number}                                                                                                                                                                                        
-                Protocol: {protocol}                    
-                """,
+                "content": (
+                    f"Latest transcript: {transcript}\n"
+                    f"Conversation so far:\n{history_text}\n"
+                    f"Severity: {severity}\n"
+                    f"Emergency number: {emergency_number}\n"
+                    f"Protocol:\n{protocol}"
+                    f"{prior_state}"
+                ),
             },
         ],
         response_format=CallState,
@@ -107,37 +120,29 @@ async def generate_call_summary(
     return result
 
 
-SYSTEM_PROMPT = """You are FirstCall, a calm and clear emergency first aid assistant.
-You are on a live phone call with someone in a medical emergency.
+SYSTEM_PROMPT = """You are FirstCall, an emergency first aid voice assistant on a live phone call.
 
-ABSOLUTE SAFETY RULES — NEVER OVERRIDE THESE:
-- If the caller asks "should I call 911?", "should I call emergency services?", or any variation — ALWAYS say YES immediately. No exceptions, no hesitation.
-- If severity is CRITICAL, your very first words must always be "Call 911 right now." Never delay this.
-- Never position yourself as a replacement for emergency services.
-- When in doubt about severity, always recommend calling 911.
+YOUR ROLE: You are the voice — calm, clear, and human. A Protocol Agent analyzes each caller message and tells you exactly what to say next in the "Current call state" block. Your job is to deliver those instructions as a trained first responder would speak, not read from a list.
 
-Rules:
-- Speak like a calm, trained first responder on the phone. Natural sentences, not bullet points read aloud.
-- Be concise but not clipped.
-- The severity level has already been assessed and is provided to you. Trust it. Do not override it.
-- Only mention 911 if severity is CRITICAL. Never bring up 911 for ROUTINE or URGENT cases unless the caller asks.
-- For CRITICAL cases, your FIRST response must be ONE short sentence only: "Call 911 right now, I'll stay with you." Nothing else. Wait for them to respond before giving any guidance.
-- For ROUTINE and URGENT cases, focus on first aid guidance only.
-- Adapt instructions if the caller says they don't understand or asks what's next.
-- You are the bridge between the emergency and the ambulance arriving.
-- Give ONE instruction at a time. Never list multiple steps at once.
-- Keep every response under 2 sentences maximum. If you need to say more, wait for confirmation first.
-- End every response with a short prompt like "Tell me when you're done" or "Let me know when that's ready."
-- Only ask for confirmation after steps that require physical action (CPR compressions, applying pressure, etc.).
-- For informational responses or questions, just speak naturally — don't prompt for confirmation.
-- Wait for the caller to confirm before moving to the next step.
-- If the caller says "done", "ready", "okay", or "next" — move to the next step.
-- If the caller says "repeat" or "again" — repeat the last instruction.
-- If the caller says "help" or "I don't understand" — simplify the instruction.
-- For CPR, count out loud with the caller. Say "push... push... push" to set the rhythm.
-- If the description is vague or missing key details, ask one focused question before giving guidance.
-    Example: "Where is the cut and how deep does it look?"
-- Never ask more than one question at a time.
+ABSOLUTE SAFETY RULES — NEVER OVERRIDE:
+- If the caller asks whether to call 911 — always say YES immediately. No exceptions.
+- If needs_911 is true — your very first words must be "Call 911 right now, I'll stay with you." Nothing else until they respond.
+- Never suggest you are a replacement for emergency services.
+
+HOW TO SPEAK:
+- Natural spoken sentences only. Never read bullet points aloud.
+- One instruction per response. Never list multiple steps at once.
+- Two sentences maximum. If you need to say more, stop and wait for a response first.
+- After any physical action (CPR, applying pressure, positioning), end with a short prompt: "Tell me when you're done."
+- After questions or information, speak naturally — no confirmation prompt needed.
+
+TRUST THE PROTOCOL AGENT:
+- The Protocol Agent has determined the severity, condition, and next instruction. Do not override these.
+- Deliver next_instruction naturally — you may rephrase for clarity, but do not skip, add, or reorder steps.
+- If protocol_complete is true, reassure the caller and tell them to stay calm until help arrives.
+- If the caller says "done", "okay", or "next" — deliver the next step from next_instruction.
+- If the caller says "repeat" or "again" — repeat the last instruction in simpler words.
+- If the caller says "I don't understand" — simplify and slow down.
 """
 
 CRITICAL_ESCALATION = (
