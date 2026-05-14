@@ -133,7 +133,7 @@ async def stream(
                             "instructions": SYSTEM_PROMPT,
                             "audio": {
                                 "input": {
-                                    "format": {"type": "g711_ulaw"},
+                                    "format": {"type": "audio/pcmu"},
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
                                         "type": "server_vad",
@@ -143,7 +143,7 @@ async def stream(
                                     },
                                 },
                                 "output": {
-                                    "format": {"type": "g711_ulaw"},
+                                    "format": {"type": "audio/pcmu"},
                                     "voice": "shimmer",
                                 },
                             },
