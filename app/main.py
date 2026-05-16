@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 
 import websockets
 from dotenv import load_dotenv
@@ -257,8 +258,13 @@ async def stream(
 
                         if transcript and call_sid:
                             try:
+                                t0 = time.monotonic()
                                 state = await extract_call_state(
                                     transcript, conversation_history, country_code, last_state
+                                )
+                                elapsed_ms = (time.monotonic() - t0) * 1000
+                                put_metric(
+                                    "TranscriptToResponseMs", elapsed_ms, unit="Milliseconds"
                                 )
                                 last_state = state
                                 logger.info(
