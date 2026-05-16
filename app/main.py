@@ -146,9 +146,9 @@ async def stream(
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
                                         "type": "semantic_vad",
-                                        "threshold": 0.8,
-                                        "silence_duration_ms": 400,
-                                        "prefix_padding_ms": 300,
+                                        "eagerness": "low",
+                                        "create_response": True,
+                                        "interrupt_response": True,
                                     },
                                 },
                                 "output": {
