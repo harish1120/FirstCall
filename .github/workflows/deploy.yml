@@ -50,7 +50,7 @@ jobs:
               "cd /home/ubuntu/FirstCall && docker build -t firstcall .",
               "docker stop firstcall || true",
               "docker rm firstcall || true",
-              "docker run -d -p 8000:8000 --env-file /home/ubuntu/FirstCall/.env --name firstcall firstcall",
+              "docker run -d -p 8000:8000 --env-file /home/ubuntu/FirstCall/.env --log-driver awslogs --log-opt awslogs-region=ca-central-1 --log-opt awslogs-group=/firstcall/app --log-opt awslogs-stream=ec2 --name firstcall firstcall",
               "cp /home/ubuntu/FirstCall/index.html /var/www/html/index.html",
               "cp -r /home/ubuntu/FirstCall/static/ /var/www/html/static/",
               "chown -R www-data:www-data /var/www/html/"

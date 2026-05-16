@@ -1,12 +1,14 @@
 import asyncio
 import json
 import os
+import secrets
 import time
 
 import websockets
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Request, WebSocket, status
-from fastapi.responses import Response
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, status
+from fastapi.responses import HTMLResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from twilio.request_validator import RequestValidator
@@ -27,6 +29,7 @@ from app.metrics import put_metric
 
 load_dotenv()
 logger = get_logger("main")
+security = HTTPBasic()
 
 BASE_URL = os.getenv("BASE_URL", "")
 validator = RequestValidator(os.getenv("TWILIO_AUTH_TOKEN", ""))
@@ -347,3 +350,21 @@ async def stream(
     except Exception as e:
         logger.error("OpenAI connection failed", extra={"error": str(e)})
         put_metric("CallsFailed", 1)
+
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(security)):  # noqa: B008
+    valid_user = secrets.compare_digest(credentials.username, os.getenv("ADMIN_USER", "admin"))
+    valid_pass = secrets.compare_digest(credentials.password, os.getenv("ADMIN_PASSWORD", ""))
+    if not (valid_user and valid_pass):
+        raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(credentials: HTTPBasicCredentials = Depends(require_admin)):  # noqa: B008
+    return """                                                                                                                                                                                                              
+      <html>                                                
+        <body style="margin:0">                                                                                                                                                                                               
+          <iframe src="https://cloudwatch.amazonaws.com/dashboard.html?dashboard=firstcall-prod-dashboard&context=eyJSIjoidXMtZWFzdC0xIiwiRCI6ImN3LWRiLTk1MzAwNTgxOTMxMSIsIlUiOiJ1cy1lYXN0LTFfUmZXYzkyZHY3IiwiQyI6IjduMWJlMGJlMGhyMG5nY2c3ZmhoMmViZG5jIiwiSSI6InVzLWVhc3QtMTpiODk0YmU3MC0zNjMxLTRmOGItYjZiYS01MTdiOTkzNjA0NzAiLCJNIjoiUHVibGljIn0=" width="100%" height="100%" frameborder="0"/>                                                                                                                                
+        </body>                               
+      </html>                                                                                                                                                                                                                 
+      """

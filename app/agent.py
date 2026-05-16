@@ -8,11 +8,12 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
+from app.logger import get_logger
 from app.protocols.loader import get_first_aid_protocol
 from app.triage import Severity, get_emergency_number, triage_severity
 
 load_dotenv()
-
+logger = get_logger("agent")
 client = AsyncOpenAI()
 _redis_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
 
@@ -221,7 +222,7 @@ async def build_response(
                 yield buffer.strip()
                 buffer = ""
     except Exception as e:
-        print(f"OpenAI error: {e}")
+        logger.error("OpenAI connection failed", extra={"error": str(e)})
         reply = "I am having trouble connecting. Please call 911 directly."
         yield reply
 
