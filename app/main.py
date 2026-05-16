@@ -234,6 +234,55 @@ async def stream(
 
             async def openai_to_twilio() -> None:
                 nonlocal last_state
+
+                async def run_protocol_agent(
+                    t: str, h: list[str], cc: str, prev: CallState | None
+                ) -> None:
+                    nonlocal last_state
+                    try:
+                        t0 = time.monotonic()
+                        state = await extract_call_state(t, h, cc, prev)
+                        elapsed_ms = (time.monotonic() - t0) * 1000
+                        put_metric("TranscriptToResponseMs", elapsed_ms, unit="Milliseconds")
+                        last_state = state
+                        logger.info(
+                            "Protocol agent state",
+                            extra={
+                                "step": state.protocol_step,
+                                "severity": state.severity,
+                                "confirmed": state.caller_confirmed,
+                                "call_sid": call_sid,
+                                "latency_ms": round(elapsed_ms),
+                            },
+                        )
+                        call_state_block = (
+                            f"\n\n--- CURRENT CALL STATE (from Protocol Agent) ---"
+                            f"\nSeverity: {state.severity}"
+                            f"\nCondition: {state.condition}"
+                            f"\nProtocol step: {state.protocol_step}"
+                            f"\nCaller confirmed last action: {state.caller_confirmed}"
+                            f"\nNeeds 911: {state.needs_911}"
+                            f"\nProtocol complete: {state.protocol_complete}"
+                            f"\n\nSAY THIS NEXT: {state.next_instruction}"
+                            f"\n--- END CALL STATE ---"
+                        )
+                        await openai_ws.send(
+                            json.dumps(
+                                {
+                                    "type": "session.update",
+                                    "session": {
+                                        "instructions": SYSTEM_PROMPT + call_state_block,
+                                    },
+                                }
+                            )
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "Protocol agent error",
+                            extra={"error": str(e), "call_sid": call_sid},
+                        )
+                        put_metric("ProtocolAgentErrors", 1)
+
                 async for raw in openai_ws:
                     data = json.loads(raw)
                     event = data.get("type")
@@ -257,54 +306,15 @@ async def stream(
                         )
 
                         if transcript and call_sid:
-                            try:
-                                t0 = time.monotonic()
-                                state = await extract_call_state(
-                                    transcript, conversation_history, country_code, last_state
-                                )
-                                elapsed_ms = (time.monotonic() - t0) * 1000
-                                put_metric(
-                                    "TranscriptToResponseMs", elapsed_ms, unit="Milliseconds"
-                                )
-                                last_state = state
-                                logger.info(
-                                    "Protocol agent state",
-                                    extra={
-                                        "step": state.protocol_step,
-                                        "severity": state.severity,
-                                        "confirmed": state.caller_confirmed,
-                                        "call_sid": call_sid,
-                                    },
-                                )
-                                call_state_block = (
-                                    f"\n\n--- CURRENT CALL STATE (from Protocol Agent) ---"
-                                    f"\nSeverity: {state.severity}"
-                                    f"\nCondition: {state.condition}"
-                                    f"\nProtocol step: {state.protocol_step}"
-                                    f"\nCaller confirmed last action: {state.caller_confirmed}"
-                                    f"\nNeeds 911: {state.needs_911}"
-                                    f"\nProtocol complete: {state.protocol_complete}"
-                                    f"\n\nSAY THIS NEXT: {state.next_instruction}"
-                                    f"\n--- END CALL STATE ---"
-                                )
-                                await openai_ws.send(
-                                    json.dumps(
-                                        {
-                                            "type": "session.update",
-                                            "session": {
-                                                "instructions": SYSTEM_PROMPT + call_state_block,
-                                            },
-                                        }
-                                    )
-                                )
-                            except Exception as e:
-                                logger.error(
-                                    "Protocol agent error",
-                                    extra={"error": str(e), "call_sid": call_sid},
-                                )
-                                put_metric("ProtocolAgentErrors", 1)
-
                             conversation_history.append(transcript)
+                            asyncio.create_task(
+                                run_protocol_agent(
+                                    transcript,
+                                    list(conversation_history),
+                                    country_code,
+                                    last_state,
+                                )
+                            )
 
                     elif event == "input_audio_buffer.speech_started":
                         logger.info("Barge-in detected", extra={"call_sid": call_sid})
