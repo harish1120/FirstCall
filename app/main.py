@@ -5,7 +5,7 @@ import os
 import websockets
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request, WebSocket, status
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from twilio.request_validator import RequestValidator
@@ -21,9 +21,11 @@ from app.agent import (
     save_session,
 )
 from app.database import Base, engine, get_db
-from app.tts import text_to_speech_stream
+from app.logger import get_logger
+from app.metrics import put_metric
 
 load_dotenv()
+logger = get_logger("main")
 
 BASE_URL = os.getenv("BASE_URL", "")
 validator = RequestValidator(os.getenv("TWILIO_AUTH_TOKEN", ""))
@@ -49,6 +51,7 @@ async def health():
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
+    put_metric("CallsIncoming", 1)
     country = form.get("FromCountry", "US")
     ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -62,22 +65,22 @@ async def handle_call(request: Request):
     return Response(content=twiml, media_type="application/xml")
 
 
-@app.get("/audio/{call_sid}")
-async def audio_stream(call_sid: str):
-    text = PENDING_AUDIO.pop(call_sid, None)
-    if not text:
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
-    return StreamingResponse(text_to_speech_stream(text), media_type="audio/mpeg")
+# @app.get("/audio/{call_sid}")
+# async def audio_stream(call_sid: str):
+#     text = PENDING_AUDIO.pop(call_sid, None)
+#     if not text:
+#         return Response(status_code=status.HTTP_404_NOT_FOUND)
+#     return StreamingResponse(text_to_speech_stream(text), media_type="audio/mpeg")
 
 
-@app.post("/handle-recording")
-async def handle_recording(request: Request):
-    """Receives the recorded audio URL from Twilio after the caller speaks."""
-    twiml = """<?xml version="1.0" encoding="UTF-8"?>
-    <Response>
-        <Say>Thank you. Processing your request.</Say>
-    </Response>"""
-    return Response(content=twiml, media_type="application/xml")
+# @app.post("/handle-recording")
+# async def handle_recording(request: Request):
+#     """Receives the recorded audio URL from Twilio after the caller speaks."""
+#     twiml = """<?xml version="1.0" encoding="UTF-8"?>
+#     <Response>
+#         <Say>Thank you. Processing your request.</Say>
+#     </Response>"""
+#     return Response(content=twiml, media_type="application/xml")
 
 
 @app.api_route("/call-status", methods=["GET", "POST"], status_code=status.HTTP_201_CREATED)
@@ -101,6 +104,10 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
     )
     db.add(call_log)
     db.commit()
+    put_metric("CallDuration", int(duration_seconds), unit="Seconds")
+    put_metric("CallsBySeverity", 1, dimensions={"Severity": session_meta["severity"]})
+    if session_meta.get("called_911"):
+        put_metric("Called911", 1)
     clear_session(call_sid)
     return {"status": "logged"}
 
@@ -117,7 +124,7 @@ async def stream(
     country_code: str = "US"
     last_state: CallState | None = None
 
-    print(f"[OpenAI] Connecting... API key set: {bool(OPENAI_API_KEY)}")
+    logger.info("OpenAI connecting", extra={"api_key_set": bool(OPENAI_API_KEY)})
     try:
         async with websockets.connect(
             "wss://api.openai.com/v1/realtime?model=gpt-realtime-2",
@@ -158,10 +165,11 @@ async def stream(
                 async for message in websocket.iter_text():
                     data = json.loads(message)
                     if data["event"] == "start":
+                        put_metric("CallsConnected", 1)
                         stream_sid = data["start"]["streamSid"]
                         call_sid = data["start"]["callSid"]
                         country_code = data["start"]["customParameters"].get("country", "US")
-                        print(f"[WS] Stream started: call_sid={call_sid}")
+                        logger.info("Stream started", extra={"call_sid": call_sid})
                         await openai_ws.send(
                             json.dumps(
                                 {
@@ -182,7 +190,8 @@ async def stream(
                             )
                         )
                     elif data["event"] == "stop":
-                        print("[WS] Stream stopped")
+                        logger.info("Stream stopped", extra={"call_sid": call_sid})
+                        put_metric("CallsCompleted", 1)
                         if call_sid and last_state:
                             save_session(
                                 call_sid,
@@ -200,7 +209,10 @@ async def stream(
                                 summary = await generate_call_summary(
                                     conversation_history, country_code
                                 )
-                                print(f"[SUMMARY] {summary.summary}")
+                                logger.info(
+                                    "Summary generated",
+                                    extra={"summary": summary.summary, "call_sid": call_sid},
+                                )
                                 save_session(
                                     call_sid,
                                     {
@@ -213,7 +225,10 @@ async def stream(
                                     },
                                 )
                             except Exception as e:
-                                print(f"[SUMMARY] Error:{e}")
+                                logger.error(
+                                    "Summary error", extra={"error": str(e), "call_sid": call_sid}
+                                )
+                                put_metric("SummaryAgentErrors", 1)
                         break
 
             async def openai_to_twilio() -> None:
@@ -235,7 +250,10 @@ async def stream(
 
                     elif event == "conversation.item.input_audio_transcription.completed":
                         transcript = data.get("transcript", "")
-                        print(f"[TRANSCRIPT] {transcript}")
+                        logger.info(
+                            "Transcript received",
+                            extra={"transcript": transcript, "call_sid": call_sid},
+                        )
 
                         if transcript and call_sid:
                             try:
@@ -243,8 +261,14 @@ async def stream(
                                     transcript, conversation_history, country_code, last_state
                                 )
                                 last_state = state
-                                print(
-                                    f"[PROTOCOL AGENT] step={state.protocol_step} severity={state.severity} confirmed={state.caller_confirmed}"
+                                logger.info(
+                                    "Protocol agent state",
+                                    extra={
+                                        "step": state.protocol_step,
+                                        "severity": state.severity,
+                                        "confirmed": state.caller_confirmed,
+                                        "call_sid": call_sid,
+                                    },
                                 )
                                 call_state_block = (
                                     f"\n\n--- CURRENT CALL STATE (from Protocol Agent) ---"
@@ -268,12 +292,16 @@ async def stream(
                                     )
                                 )
                             except Exception as e:
-                                print(f"[PROTOCOL AGENT] Error: {e}")
+                                logger.error(
+                                    "Protocol agent error",
+                                    extra={"error": str(e), "call_sid": call_sid},
+                                )
+                                put_metric("ProtocolAgentErrors", 1)
 
                             conversation_history.append(transcript)
 
                     elif event == "input_audio_buffer.speech_started":
-                        print("[BARGE-IN] Speech detected, clearing Twilio buffer")
+                        logger.info("Barge-in detected", extra={"call_sid": call_sid})
                         if stream_sid:
                             await websocket.send_text(
                                 json.dumps(
@@ -285,7 +313,7 @@ async def stream(
                             )
 
                     elif event == "response.cancelled":
-                        print("[BARGE-IN] Response cancelled")
+                        logger.info("Response cancelled", extra={"call_sid": call_sid})
                         if stream_sid:
                             await websocket.send_text(
                                 json.dumps(
@@ -297,8 +325,9 @@ async def stream(
                             )
 
                     elif event == "error":
-                        print(f"[OpenAI Error] {data}")
+                        logger.error("OpenAI error", extra={"error": data})
 
             await asyncio.gather(twilio_to_openai(), openai_to_twilio())
     except Exception as e:
-        print(f"[OpenAI] Connection failed: {e}")
+        logger.error("OpenAI connection failed", extra={"error": str(e)})
+        put_metric("CallsFailed", 1)
