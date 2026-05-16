@@ -145,8 +145,8 @@ async def stream(
                                     "format": {"type": "audio/pcmu"},
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
-                                        "type": "server_vad",
-                                        "threshold": 0.6,
+                                        "type": "semantic_vad",
+                                        "threshold": 0.8,
                                         "silence_duration_ms": 400,
                                         "prefix_padding_ms": 300,
                                     },
