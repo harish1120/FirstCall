@@ -1,3 +1,4 @@
+import re
 from enum import StrEnum
 
 
@@ -27,6 +28,14 @@ CRITICAL_KEYWORDS = [
     "drowning",
     "unresponsive",
     "unconscious",
+    "difficulty breathing",
+    "not responsive",
+    "turned blue",
+    "stopped breathing",
+    "heart stopped",
+    "can't breathe",
+    "not waking up",
+    "collapsed",
 ]
 
 URGENT_KEYWORDS = [
@@ -46,12 +55,23 @@ URGENT_KEYWORDS = [
     "knocked out",
     "unconscious",
     "trauma",
+    "hit by car",
+    "knocked unconscious",
+    "can't move",
+    "head wound",
+    "deep wound",
+    "won't stop",
+    "heavy bleeding",
 ]
+
+
+def strip_negations(text: str) -> str:
+    return re.sub(r"\b(no|not|isn't|wasn't|never|without)\b.{0,25}", "", text)
 
 
 def triage_severity(description: str) -> Severity:
     """Rule-based triage gate. HITL — not delegated to the LLM."""
-    text = description.lower()
+    text = strip_negations(description.lower())
     if any(kw in text for kw in CRITICAL_KEYWORDS):
         return Severity.CRITICAL
     if any(kw in text for kw in URGENT_KEYWORDS):
