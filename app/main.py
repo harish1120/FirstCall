@@ -55,8 +55,9 @@ async def health():
 async def handle_call(request: Request):
     """Twilio calls this endpoint when someone dials the FirstCall number."""
     form = await request.form()
+    url = str(request.url).replace("http://", "https://")
     signature = request.headers.get("X-Twilio-Signature", "")
-    if not validator.validate(str(request.url), dict(form), signature):
+    if not validator.validate(url, dict(form), signature):
         return Response(status_code=403)
     put_metric("CallsIncoming", 1)
     country = form.get("FromCountry", "US")
@@ -93,8 +94,9 @@ async def handle_call(request: Request):
 @app.api_route("/call-status", methods=["GET", "POST"], status_code=status.HTTP_201_CREATED)
 async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
     form = await request.form()
+    url = str(request.url).replace("http://", "https://")
     signature = request.headers.get("X-Twilio-Signature", "")
-    if not validator.validate(str(request.url), dict(form), signature):
+    if not validator.validate(url, dict(form), signature):
         return Response(status_code=403)
     call_sid = str(form.get("CallSid") or "")
     duration_seconds = str(form.get("CallDuration") or "0")
