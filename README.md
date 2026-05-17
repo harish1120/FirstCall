@@ -98,11 +98,15 @@ The 911 escalation logic is the most critical part of the system. It is **not an
 
 - **Voice-first** — No app, no account, no navigation. Just call.
 - **Real-time audio** — OpenAI Realtime API handles STT, LLM, and TTS in a single WebSocket stream. No sequential pipeline latency.
-- **Barge-in support** — Server-side VAD detects when the caller starts speaking mid-response and interrupts immediately. No waiting for the agent to finish.
+- **Semantic VAD** — Uses model-based turn detection to handle panicked, fragmented speech and noisy environments better than silence-threshold detection.
+- **Barge-in support** — Detects when the caller starts speaking mid-response and interrupts immediately. No waiting for the agent to finish.
+- **Non-blocking Protocol Agent** — Runs as a background task so the Voice Agent responds immediately without waiting for the LLM extraction to complete.
 - **Multi-agent coordination** — Protocol Agent, Voice Agent, and Summary Agent each own a distinct responsibility and run concurrently.
 - **State persistence** — Protocol Agent carries severity and step count across turns using `last_state`, so short confirmations don't reset the protocol.
 - **10 first aid protocols** — Cardiac arrest (CPR), choking, severe bleeding, burns, stroke, anaphylaxis, seizure, fracture, head injury, poisoning.
 - **Country detection** — Auto-detects caller's country and uses the correct emergency number (911 / 999 / 112 / 000).
+- **Observability** — Structured JSON logging to CloudWatch Logs, custom CloudWatch metrics (call volume, latency p90, severity breakdown, 911 escalation rate), EC2 health alarms.
+- **Admin dashboard** — Password-protected `/admin` page with live CloudWatch dashboard.
 - **Audit log** — Every call logged with severity, condition, duration, steps completed, and whether 911 was recommended. No PII stored.
 
 ---
@@ -112,12 +116,13 @@ The 911 escalation logic is the most critical part of the system. It is **not an
 | Layer | Technology |
 |-------|-----------|
 | Phone | Twilio Programmable Voice + Media Streams |
-| Real-time voice | OpenAI Realtime API (gpt-realtime-2, g711 μ-law, server VAD) |
+| Real-time voice | OpenAI Realtime API (gpt-realtime-2, g711 μ-law, semantic VAD) |
 | Protocol & summary | OpenAI gpt-5.4-nano (structured output via Pydantic) |
 | Session state | Redis on AWS ElastiCache |
 | Backend | FastAPI + Python 3.12 |
 | Deploy | AWS EC2 + ALB + ACM (SSL) |
 | Database | PostgreSQL on AWS RDS |
+| Observability | CloudWatch Logs + custom metrics + dashboard |
 | CI/CD | GitHub Actions → AWS SSM |
 
 ---
@@ -222,6 +227,11 @@ REDIS_SSL=false
 RDS_HOST=
 RDS_USER=postgres
 RDS_DB=postgres
+
+AWS_REGION=ca-central-1
+
+ADMIN_USER=admin
+ADMIN_PASSWORD=
 ```
 
 ---
