@@ -1,9 +1,9 @@
 import asyncio
-import json
 import os
 import secrets
 import time
 
+import orjson
 import websockets
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, status
@@ -17,6 +17,7 @@ from app import models
 from app.agent import (
     SYSTEM_PROMPT,
     CallState,
+    classify_turn,
     clear_session,
     extract_call_state,
     generate_call_summary,
@@ -25,7 +26,7 @@ from app.agent import (
 )
 from app.database import Base, engine, get_db
 from app.logger import get_logger
-from app.metrics import put_metric
+from app.metrics import metrics_worker, put_metric
 
 load_dotenv()
 logger = get_logger("main")
@@ -43,6 +44,11 @@ app = FastAPI(title="FirstCall")
 app.state.limiter = limiter
 
 PENDING_AUDIO: dict[str, str] = {}
+
+
+@app.on_event("startup")
+async def start_metrics_worker():
+    asyncio.create_task(metrics_worker())
 
 
 @app.get("/health")
@@ -145,7 +151,7 @@ async def stream(
             },
         ) as openai_ws:
             await openai_ws.send(
-                json.dumps(
+                orjson.dumps(
                     {
                         "type": "session.update",
                         "session": {
@@ -157,8 +163,8 @@ async def stream(
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
                                         "type": "semantic_vad",
-                                        "eagerness": "low",
-                                        "create_response": True,
+                                        "eagerness": "high",
+                                        "create_response": False,
                                         "interrupt_response": True,
                                     },
                                 },
@@ -169,13 +175,13 @@ async def stream(
                             },
                         },
                     }
-                )
+                ).decode()
             )
 
             async def twilio_to_openai() -> None:
                 nonlocal stream_sid, call_sid, country_code
                 async for message in websocket.iter_text():
-                    data = json.loads(message)
+                    data = orjson.loads(message)
                     if data["event"] == "start":
                         put_metric("CallsConnected", 1)
                         stream_sid = data["start"]["streamSid"]
@@ -183,23 +189,23 @@ async def stream(
                         country_code = data["start"]["customParameters"].get("country", "US")
                         logger.info("Stream started", extra={"call_sid": call_sid})
                         await openai_ws.send(
-                            json.dumps(
+                            orjson.dumps(
                                 {
                                     "type": "response.create",
                                     "response": {
                                         "instructions": "Greet the caller. Say exactly: 'Hello, this is FirstCall. Please describe the emergency.' Nothing else."
                                     },
                                 }
-                            )
+                            ).decode()
                         )
                     elif data["event"] == "media":
                         await openai_ws.send(
-                            json.dumps(
+                            orjson.dumps(
                                 {
                                     "type": "input_audio_buffer.append",
                                     "audio": data["media"]["payload"],
                                 }
-                            )
+                            ).decode()
                         )
                     elif data["event"] == "stop":
                         logger.info("Stream stopped", extra={"call_sid": call_sid})
@@ -245,11 +251,15 @@ async def stream(
 
             async def openai_to_twilio() -> None:
                 nonlocal last_state
+                _protocol_agent_running = False
 
                 async def run_protocol_agent(
                     t: str, h: list[str], cc: str, prev: CallState | None
                 ) -> None:
-                    nonlocal last_state
+                    nonlocal last_state, _protocol_agent_running
+                    if _protocol_agent_running:
+                        return
+                    _protocol_agent_running = True
                     try:
                         t0 = time.monotonic()
                         state = await extract_call_state(t, h, cc, prev)
@@ -278,14 +288,14 @@ async def stream(
                             f"\n--- END CALL STATE ---"
                         )
                         await openai_ws.send(
-                            json.dumps(
+                            orjson.dumps(
                                 {
-                                    "type": "session.update",
-                                    "session": {
-                                        "instructions": SYSTEM_PROMPT + call_state_block,
+                                    "type": "response.create",
+                                    "response": {
+                                        "instructions": call_state_block,
                                     },
                                 }
-                            )
+                            ).decode()
                         )
                     except Exception as e:
                         logger.error(
@@ -293,20 +303,22 @@ async def stream(
                             extra={"error": str(e), "call_sid": call_sid},
                         )
                         put_metric("ProtocolAgentErrors", 1)
+                    finally:
+                        _protocol_agent_running = False
 
                 async for raw in openai_ws:
-                    data = json.loads(raw)
+                    data = orjson.loads(raw)
                     event = data.get("type")
 
                     if event == "response.output_audio.delta" and stream_sid:
                         await websocket.send_text(
-                            json.dumps(
+                            orjson.dumps(
                                 {
                                     "event": "media",
                                     "streamSid": stream_sid,
                                     "media": {"payload": data["delta"]},
                                 }
-                            )
+                            ).decode()
                         )
 
                     elif event == "conversation.item.input_audio_transcription.completed":
@@ -318,37 +330,54 @@ async def stream(
 
                         if transcript and call_sid:
                             conversation_history.append(transcript)
-                            asyncio.create_task(
-                                run_protocol_agent(
-                                    transcript,
-                                    list(conversation_history),
-                                    country_code,
-                                    last_state,
+                            intent = classify_turn(transcript) if last_state else "new_info"
+
+                            if intent == "repeat" and last_state:
+                                await openai_ws.send(
+                                    orjson.dumps(
+                                        {
+                                            "type": "response.create",
+                                            "response": {
+                                                "instructions": (
+                                                    f"The caller asked you to repeat."
+                                                    f"Repeat this instruction in simpler words: {last_state.next_instruction}"
+                                                )
+                                            },
+                                        }
+                                    ).decode()
                                 )
-                            )
+                            else:
+                                asyncio.create_task(
+                                    run_protocol_agent(
+                                        transcript,
+                                        list(conversation_history),
+                                        country_code,
+                                        last_state,
+                                    )
+                                )
 
                     elif event == "input_audio_buffer.speech_started":
                         logger.info("Barge-in detected", extra={"call_sid": call_sid})
                         if stream_sid:
                             await websocket.send_text(
-                                json.dumps(
+                                orjson.dumps(
                                     {
                                         "event": "clear",
                                         "streamSid": stream_sid,
                                     }
-                                )
+                                ).decode()
                             )
 
                     elif event == "response.cancelled":
                         logger.info("Response cancelled", extra={"call_sid": call_sid})
                         if stream_sid:
                             await websocket.send_text(
-                                json.dumps(
+                                orjson.dumps(
                                     {
                                         "event": "clear",
                                         "streamSid": stream_sid,
                                     }
-                                )
+                                ).decode()
                             )
 
                     elif event == "error":

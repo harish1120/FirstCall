@@ -20,6 +20,20 @@ _redis_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
 r = redis.Redis(
     host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0, ssl=_redis_ssl, ssl_cert_reqs="none"
 )
+_SIMPLE_ACK = {
+    "okay",
+    "ok",
+    "done",
+    "yes",
+    "got it",
+    "next",
+    "alright",
+    "ready",
+    "sure",
+    "yep",
+    "yup",
+}
+_REPEAT_WORDS = {"repeat", "again", "what", "sorry", "understand", "huh"}
 
 
 class CallState(BaseModel):
@@ -48,7 +62,7 @@ async def extract_call_state(
     last_state: "CallState | None" = None,
 ) -> "CallState":
     full_text = " ".join(conversation_history) + " " + transcript
-    severity = triage_severity(full_text) if not last_state else last_state.severity
+    severity = triage_severity(full_text)
     protocol = get_first_aid_protocol(full_text)
     emergency_number = get_emergency_number(country_code)
     history_text = "\n".join(conversation_history) if conversation_history else "No history yet."
@@ -233,6 +247,15 @@ async def build_response(
 def get_session_meta(call_sid: str) -> dict[str, Any]:
     session = get_session(call_sid)
     return {} if session is None else session  # noqa: SIM401
+
+
+def classify_turn(transcript: str) -> str:
+    t = transcript.lower().strip().rstrip(".").rstrip("!")
+    if t in _SIMPLE_ACK or t.startswith("i'm done") or t.startswith("im done"):
+        return "advance"
+    if any(w in t for w in _REPEAT_WORDS):
+        return "repeat"
+    return "new_info"
 
 
 if __name__ == "__main__":
