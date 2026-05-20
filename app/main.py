@@ -106,7 +106,7 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
         return Response(status_code=403)
     call_sid = str(form.get("CallSid") or "")
     duration_seconds = str(form.get("CallDuration") or "0")
-    session_meta = get_session_meta(call_sid)
+    session_meta = await get_session_meta(call_sid)
 
     if not session_meta:
         return {"status": "no session"}
@@ -126,7 +126,7 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
     put_metric("CallsBySeverity", 1, dimensions={"Severity": session_meta["severity"]})
     if session_meta.get("called_911"):
         put_metric("Called911", 1)
-    clear_session(call_sid)
+    await clear_session(call_sid)
     return {"status": "logged"}
 
 
@@ -211,7 +211,7 @@ async def stream(
                         logger.info("Stream stopped", extra={"call_sid": call_sid})
                         put_metric("CallsCompleted", 1)
                         if call_sid and last_state:
-                            save_session(
+                            await save_session(
                                 call_sid,
                                 {
                                     "severity": last_state.severity,
@@ -231,7 +231,7 @@ async def stream(
                                     "Summary generated",
                                     extra={"summary": summary.summary, "call_sid": call_sid},
                                 )
-                                save_session(
+                                await save_session(
                                     call_sid,
                                     {
                                         "severity": summary.severity,

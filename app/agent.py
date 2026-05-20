@@ -1,9 +1,9 @@
-import json
 import os
 from collections.abc import AsyncGenerator
 from typing import Any, Literal
 
-import redis
+import orjson
+import redis.asyncio as redis
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -65,13 +65,16 @@ async def extract_call_state(
     severity = triage_severity(full_text)
     protocol = get_first_aid_protocol(full_text)
     emergency_number = get_emergency_number(country_code)
-    history_text = "\n".join(conversation_history) if conversation_history else "No history yet."
+    history_text = (
+        "\n".join(conversation_history[-3:]) if conversation_history else "No history yet."
+    )
 
     prior_state = ""
     if last_state:
         prior_state = (
-            f"\nPrevious state: step={last_state.protocol_step}, "
-            f"condition={last_state.condition}, confirmed={last_state.caller_confirmed}"
+            f"\nCall context: condition={last_state.condition}, severity={last_state.severity}"
+            f"\nProgress: step={last_state.protocol_step}, confirmed={last_state.caller_confirmed}"
+            f"\nLast instruction given: {last_state.next_instruction}"
         )
 
     response = await client.beta.chat.completions.parse(
@@ -166,17 +169,17 @@ CRITICAL_ESCALATION = (
 )
 
 
-def get_session(call_sid):
-    data = r.get(call_sid)
-    return json.loads(data) if data else None
+async def get_session(call_sid):
+    data = await r.get(call_sid)
+    return orjson.loads(data) if data else None
 
 
-def save_session(call_sid, session_data):
-    r.setex(call_sid, 3600, json.dumps(session_data))  # 1 hour TTL
+async def save_session(call_sid, session_data):
+    await r.setex(call_sid, 3600, orjson.dumps(session_data))  # 1 hour TTL
 
 
-def clear_session(call_sid):
-    r.delete(call_sid)
+async def clear_session(call_sid):
+    await r.delete(call_sid)
 
 
 async def build_response(
@@ -205,7 +208,7 @@ async def build_response(
     """
     )
 
-    session = get_session(call_sid)
+    session = await get_session(call_sid)
     if session is None:
         session = {
             "messages": [
@@ -219,11 +222,11 @@ async def build_response(
             "condition": description,
         }
 
-        save_session(call_sid, session)
+        await save_session(call_sid, session)
     else:
         session["messages"].append({"role": "user", "content": description})
         session["severity"] = severity
-        save_session(call_sid, session)
+        await save_session(call_sid, session)
 
     try:
         response = await client.chat.completions.create(
@@ -242,11 +245,11 @@ async def build_response(
         yield reply
 
     session["messages"].append({"role": "assistant", "content": reply})
-    save_session(call_sid, session)
+    await save_session(call_sid, session)
 
 
-def get_session_meta(call_sid: str) -> dict[str, Any]:
-    session = get_session(call_sid)
+async def get_session_meta(call_sid: str) -> dict[str, Any]:
+    session = await get_session(call_sid)
     return {} if session is None else session  # noqa: SIM401
 
 
