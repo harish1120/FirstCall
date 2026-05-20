@@ -347,6 +347,27 @@ async def stream(
                                     ).decode()
                                 )
                             else:
+                                if last_state:
+                                    immediate_instructions = (
+                                        f"New caller message: '{transcript}'\n"
+                                        f"Previous context: condition={last_state.condition}, "
+                                        f"severity={last_state.severity}, step={last_state.protocol_step}\n"
+                                        f"Last instruction given: {last_state.next_instruction}\n"
+                                        f"Respond to what the caller just said and continue the protocol."
+                                    )
+                                else:
+                                    immediate_instructions = (
+                                        f"The caller just said: '{transcript}'. "
+                                        f"Assess the emergency and respond immediately following your safety rules."
+                                    )
+                                await openai_ws.send(
+                                    orjson.dumps(
+                                        {
+                                            "type": "response.create",
+                                            "response": {"instructions": immediate_instructions},
+                                        }
+                                    ).decode()
+                                )
                                 asyncio.create_task(
                                     run_protocol_agent(
                                         transcript,
