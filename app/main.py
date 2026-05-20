@@ -163,9 +163,9 @@ async def stream(
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
                                         "type": "semantic_vad",
-                                        "eagerness": "high",
+                                        "eagerness": "low",
                                         "create_response": False,
-                                        "interrupt_response": True,
+                                        "interrupt_response": False,
                                     },
                                 },
                                 "output": {
@@ -276,27 +276,7 @@ async def stream(
                                 "latency_ms": round(elapsed_ms),
                             },
                         )
-                        call_state_block = (
-                            f"\n\n--- CURRENT CALL STATE (from Protocol Agent) ---"
-                            f"\nSeverity: {state.severity}"
-                            f"\nCondition: {state.condition}"
-                            f"\nProtocol step: {state.protocol_step}"
-                            f"\nCaller confirmed last action: {state.caller_confirmed}"
-                            f"\nNeeds 911: {state.needs_911}"
-                            f"\nProtocol complete: {state.protocol_complete}"
-                            f"\n\nSAY THIS NEXT: {state.next_instruction}"
-                            f"\n--- END CALL STATE ---"
-                        )
-                        await openai_ws.send(
-                            orjson.dumps(
-                                {
-                                    "type": "response.create",
-                                    "response": {
-                                        "instructions": call_state_block,
-                                    },
-                                }
-                            ).decode()
-                        )
+                        # last_state is now updated — Option A uses it on the next turn
                     except Exception as e:
                         logger.error(
                             "Protocol agent error",
@@ -379,6 +359,7 @@ async def stream(
 
                     elif event == "input_audio_buffer.speech_started":
                         logger.info("Barge-in detected", extra={"call_sid": call_sid})
+                        await openai_ws.send(orjson.dumps({"type": "response.cancel"}).decode())
                         if stream_sid:
                             await websocket.send_text(
                                 orjson.dumps(
