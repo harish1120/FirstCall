@@ -383,7 +383,11 @@ async def stream(
                             )
 
                     elif event == "error":
-                        logger.error("OpenAI error", extra={"error": data})
+                        code = data.get("error", {}).get("code", "")
+                        if code == "response_cancel_not_active":
+                            pass
+                        else:
+                            logger.error("OpenAI error", extra={"error": data})
 
             await asyncio.gather(twilio_to_openai(), openai_to_twilio())
     except Exception as e:
