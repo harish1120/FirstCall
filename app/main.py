@@ -27,6 +27,7 @@ from app.agent import (
 from app.database import Base, engine, get_db
 from app.logger import get_logger
 from app.metrics import metrics_worker, put_metric
+from app.triage import Severity, get_emergency_number, triage_severity
 
 load_dotenv()
 logger = get_logger("main")
@@ -336,7 +337,16 @@ async def stream(
                                     f"Repeat this instruction in simpler words: {last_state.next_instruction}"
                                 )
                             else:
-                                if last_state:
+                                live_severity = triage_severity(transcript)
+                                emergency_number = get_emergency_number(country_code)
+                                if live_severity == Severity.CRITICAL:
+                                    immediate_instructions = (
+                                        f"CRITICAL EMERGENCY. Caller said: '{transcript}'. "
+                                        f"Your first words must be: "
+                                        f"'Call {emergency_number} right now, I'll stay with you.' "
+                                        f"Then begin first aid guidance."
+                                    )
+                                elif last_state:
                                     immediate_instructions = (
                                         f"New caller message: '{transcript}'\n"
                                         f"Previous context: condition={last_state.condition}, "
