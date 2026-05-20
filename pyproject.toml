@@ -20,6 +20,8 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "slowapi>=0.1.9",
     "redis>=7.4.0",
+    "orjson>=3.11.9",
+    "uvloop>=0.22.1",
 ]
 
 [dependency-groups]
