@@ -222,6 +222,7 @@ async def build_response(
         save_session(call_sid, session)
     else:
         session["messages"].append({"role": "user", "content": description})
+        session["severity"] = severity
         save_session(call_sid, session)
 
     try:

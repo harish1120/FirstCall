@@ -71,9 +71,10 @@ def strip_negations(text: str) -> str:
 
 def triage_severity(description: str) -> Severity:
     """Rule-based triage gate. HITL — not delegated to the LLM."""
-    text = strip_negations(description.lower())
-    if any(kw in text for kw in CRITICAL_KEYWORDS):
+    raw = description.lower()
+    if any(kw in raw for kw in CRITICAL_KEYWORDS):
         return Severity.CRITICAL
+    text = strip_negations(raw)
     if any(kw in text for kw in URGENT_KEYWORDS):
         return Severity.URGENT
     return Severity.ROUTINE
