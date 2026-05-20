@@ -252,6 +252,16 @@ async def stream(
             async def openai_to_twilio() -> None:
                 nonlocal last_state
                 _protocol_agent_running = False
+                _response_start: float | None = None
+
+                async def send_response(instructions: str) -> None:
+                    nonlocal _response_start
+                    _response_start = time.monotonic()
+                    await openai_ws.send(
+                        orjson.dumps(
+                            {"type": "response.create", "response": {"instructions": instructions}}
+                        ).decode()
+                    )
 
                 async def run_protocol_agent(
                     t: str, h: list[str], cc: str, prev: CallState | None
@@ -291,6 +301,14 @@ async def stream(
                     event = data.get("type")
 
                     if event == "response.output_audio.delta" and stream_sid:
+                        if _response_start is not None:
+                            ttft_ms = (time.monotonic() - _response_start) * 1000
+                            put_metric("TimeToFirstTokenMs", ttft_ms, unit="Milliseconds")
+                            logger.info(
+                                "Time to first token",
+                                extra={"ttft_ms": round(ttft_ms), "call_sid": call_sid},
+                            )
+                            _response_start = None
                         await websocket.send_text(
                             orjson.dumps(
                                 {
@@ -313,18 +331,9 @@ async def stream(
                             intent = classify_turn(transcript) if last_state else "new_info"
 
                             if intent == "repeat" and last_state:
-                                await openai_ws.send(
-                                    orjson.dumps(
-                                        {
-                                            "type": "response.create",
-                                            "response": {
-                                                "instructions": (
-                                                    f"The caller asked you to repeat."
-                                                    f"Repeat this instruction in simpler words: {last_state.next_instruction}"
-                                                )
-                                            },
-                                        }
-                                    ).decode()
+                                await send_response(
+                                    f"The caller asked you to repeat. "
+                                    f"Repeat this instruction in simpler words: {last_state.next_instruction}"
                                 )
                             else:
                                 if last_state:
@@ -340,14 +349,7 @@ async def stream(
                                         f"The caller just said: '{transcript}'. "
                                         f"Assess the emergency and respond immediately following your safety rules."
                                     )
-                                await openai_ws.send(
-                                    orjson.dumps(
-                                        {
-                                            "type": "response.create",
-                                            "response": {"instructions": immediate_instructions},
-                                        }
-                                    ).decode()
-                                )
+                                await send_response(immediate_instructions)
                                 asyncio.create_task(
                                     run_protocol_agent(
                                         transcript,
