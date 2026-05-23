@@ -163,8 +163,10 @@ async def stream(
                                     "format": {"type": "audio/pcmu"},
                                     "transcription": {"model": "gpt-4o-mini-transcribe"},
                                     "turn_detection": {
-                                        "type": "semantic_vad",
-                                        "eagerness": "low",
+                                        "type": "server_vad",
+                                        "threshold": 0.7,  # 0.0-1.0, higher = less sensitive
+                                        "prefix_padding_ms": 300,  # speech must be present for 300ms before triggering
+                                        "silence_duration_ms": 500,  # 500ms of silence = end of turn
                                         "create_response": False,
                                         "interrupt_response": False,
                                     },

@@ -32,6 +32,20 @@ _SIMPLE_ACK = {
     "sure",
     "yep",
     "yup",
+    "ок",
+    "оке",
+    "хорошо",
+    "اوکے",
+    "ٹھیک",
+    "ہاں",
+    "好",
+    "好的",
+    "可以",
+    "oui",
+    "d'accord",
+    "sí",
+    "bueno",
+    "ja",
 }
 _REPEAT_WORDS = {"repeat", "again", "what", "sorry", "understand", "huh"}
 
@@ -60,6 +74,7 @@ async def extract_call_state(
     conversation_history: list[str],
     country_code: str = "US",
     last_state: "CallState | None" = None,
+    caller_confirmed: bool = False,
 ) -> "CallState":
     full_text = " ".join(conversation_history) + " " + transcript
     severity = triage_severity(full_text)
@@ -71,10 +86,16 @@ async def extract_call_state(
 
     prior_state = ""
     if last_state:
+        confirmed_note = (
+            "The caller just confirmed completing the last action. Advance to the next step."
+            if caller_confirmed
+            else ""
+        )
         prior_state = (
             f"\nCall context: condition={last_state.condition}, severity={last_state.severity}"
-            f"\nProgress: step={last_state.protocol_step}, confirmed={last_state.caller_confirmed}"
+            f"\nProgress: step={last_state.protocol_step}, confirmed={caller_confirmed}"
             f"\nLast instruction given: {last_state.next_instruction}"
+            f"\n{confirmed_note}"
         )
 
     response = await client.beta.chat.completions.parse(
