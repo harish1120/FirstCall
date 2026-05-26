@@ -53,6 +53,11 @@ jobs:
             # Sync any new dependencies
             /home/ubuntu/.local/bin/uv sync --no-dev --project /home/ubuntu/app
 
+            # Refresh website static files
+            sudo cp /home/ubuntu/app/index.html /var/www/html/index.html
+            sudo cp -r /home/ubuntu/app/static/ /var/www/html/static/
+            sudo chown -R www-data:www-data /var/www/html/
+
             # Restart app
             sudo systemctl restart firstcall
             sleep 3
