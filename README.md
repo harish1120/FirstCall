@@ -4,9 +4,8 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-Realtime-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-ElastiCache-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-EC2+RDS+ALB-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-localhost-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-Lightsail-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **Real-time voice AI for medical emergency triage and first aid guidance.**
@@ -23,7 +22,7 @@ No app. No account. Just a phone call.
 
 Describe any medical emergency in plain language. The agent will triage the situation and guide you through what to do.
 
-> Live demo running on [firstcall.help](https://firstcall.help) — deployed on AWS, available 24/7.
+> Live demo running on [firstcall.help](https://firstcall.help) — deployed on AWS Lightsail (us-east-1), available 24/7.
 
 ---
 
@@ -61,7 +60,7 @@ You speak again → Protocol Agent updates state → Voice Agent responds
         ↓
 Call ends → Summary Agent generates a structured summary
         ↓
-Every call logged anonymously to PostgreSQL
+Every call logged anonymously to SQLite
 ```
 
 ---
@@ -105,8 +104,8 @@ The 911 escalation logic is the most critical part of the system. It is **not an
 - **State persistence** — Protocol Agent carries severity and step count across turns using `last_state`, so short confirmations don't reset the protocol.
 - **10 first aid protocols** — Cardiac arrest (CPR), choking, severe bleeding, burns, stroke, anaphylaxis, seizure, fracture, head injury, poisoning.
 - **Country detection** — Auto-detects caller's country and uses the correct emergency number (911 / 999 / 112 / 000).
-- **Observability** — Structured JSON logging to CloudWatch Logs, custom CloudWatch metrics (call volume, latency p90, severity breakdown, 911 escalation rate), EC2 health alarms.
-- **Admin dashboard** — Password-protected `/admin` page with live CloudWatch dashboard.
+- **Observability** — Structured JSON logging, custom CloudWatch metrics (call volume, latency, TTFT, severity breakdown, 911 escalation rate).
+- **Admin dashboard** — Password-protected `/admin` with CloudWatch latency/TTFT graph + live call feed showing AI summaries, per-call latency, and severity.
 - **Audit log** — Every call logged with severity, condition, duration, steps completed, and whether 911 was recommended. No PII stored.
 
 ---
@@ -118,12 +117,12 @@ The 911 escalation logic is the most critical part of the system. It is **not an
 | Phone | Twilio Programmable Voice + Media Streams |
 | Real-time voice | OpenAI Realtime API (gpt-realtime-2, g711 μ-law, semantic VAD) |
 | Protocol & summary | OpenAI gpt-5.4-nano (structured output via Pydantic) |
-| Session state | Redis on AWS ElastiCache |
+| Session state | Redis (localhost, same server) |
 | Backend | FastAPI + Python 3.12 |
-| Deploy | AWS EC2 + ALB + ACM (SSL) |
-| Database | PostgreSQL on AWS RDS |
-| Observability | CloudWatch Logs + custom metrics + dashboard |
-| CI/CD | GitHub Actions → AWS SSM |
+| Deploy | AWS Lightsail (us-east-1) + nginx + Let's Encrypt |
+| Database | SQLite (local file) |
+| Observability | CloudWatch custom metrics + dashboard |
+| CI/CD | GitHub Actions → SSH |
 
 ---
 
@@ -152,9 +151,9 @@ Partial session saved to Redis immediately (race-condition safe)
         ↓
 Summary Agent (gpt-5.4-nano) generates CallSummary
         ↓
-Full session saved to Redis
+Full session saved to Redis (with avg latency + TTFT)
         ↓
-POST /call-status (Twilio webhook) → write CallLog to PostgreSQL → clear Redis
+POST /call-status (Twilio webhook) → write CallLog to SQLite → clear Redis
 ```
 
 ---
@@ -168,7 +167,7 @@ POST /call-status (Twilio webhook) → write CallLog to PostgreSQL → clear Red
 - [ngrok](https://ngrok.com/) for local development
 - Twilio account + phone number
 - OpenAI API key
-- Redis (local or ElastiCache)
+- Redis (local — `brew install redis` on macOS or `apt install redis-server` on Linux)
 
 ### Installation
 
@@ -212,7 +211,7 @@ uv run ruff format .
 ## Environment Variables
 
 ```env
-APP_ENV=development
+APP_ENV=development          # set to 'production' to enable CloudWatch metrics
 BASE_URL=https://your-ngrok-url
 
 TWILIO_ACCOUNT_SID=
@@ -224,11 +223,10 @@ OPENAI_API_KEY=
 REDIS_HOST=localhost
 REDIS_SSL=false
 
-RDS_HOST=
-RDS_USER=postgres
-RDS_DB=postgres
-
-AWS_REGION=ca-central-1
+# CloudWatch (only needed when APP_ENV=production)
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
 
 ADMIN_USER=admin
 ADMIN_PASSWORD=
