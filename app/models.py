@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import Boolean, Column, Enum, Integer, String
+from sqlalchemy import Boolean, Column, Enum, Float, Integer, String
 from sqlalchemy.sql.expression import text
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 
@@ -19,6 +19,8 @@ class CallLog(Base):
     summary = Column(String, nullable=True)
     steps_completed = Column(Integer, nullable=True)
     called_911 = Column(Boolean, nullable=True)
+    avg_latency_ms = Column(Float, nullable=True)
+    avg_ttft_ms = Column(Float, nullable=True)
     created_at = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP")
     )
