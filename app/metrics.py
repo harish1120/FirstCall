@@ -15,7 +15,7 @@ _metrics_queue: asyncio.Queue | None = None
 def _get_client():
     global _client
     if _client is None:
-        _client = boto3.client("cloudwatch", region_name=os.getenv("AWS_REGION", "ca-central-1"))
+        _client = boto3.client("cloudwatch", region_name=os.getenv("AWS_REGION", "us-east-1"))
     return _client
 
 

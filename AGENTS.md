@@ -1,12 +1,12 @@
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
 **FirstCall** is a voice-based AI agent for medical emergency triage and first aid guidance. Users call a phone number, describe the emergency in plain language, and the AI triages severity, escalates to 911 when needed, and guides them through first aid step-by-step — voice-first, no app required.
 
-**Status:** Planning phase. The `project-firstcall-agent.md` blueprint is the authoritative design document.
+**Status:** Live at [firstcall.help](https://firstcall.help) — deployed on AWS Lightsail (us-east-1).
 
 ---
 
@@ -14,14 +14,14 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 | Layer | Technology |
 |-------|-----------|
-| Phone | Twilio Programmable Voice (webhook) |
-| STT | Deepgram Streaming API |
-| Agent | Codex API (tool use + streaming) |
-| TTS | ElevenLabs (Phase 1: Twilio built-in) |
-| Backend | FastAPI + Python |
-| Deploy | AWS EC2 + Docker |
-| Audit log | SQLite → PostgreSQL |
-| Config | YAML (triage thresholds, emergency numbers by country) |
+| Phone | Twilio Programmable Voice + Media Streams |
+| Real-time voice | OpenAI Realtime API (gpt-realtime-2, g711 μ-law, semantic VAD) |
+| Protocol & summary | OpenAI gpt-5.4-nano (structured output via Pydantic) |
+| Session state | Redis (localhost, same server) |
+| Backend | FastAPI + Python 3.12 |
+| Deploy | AWS Lightsail (us-east-1) + nginx + systemd + Let's Encrypt |
+| Database | SQLite (local file) |
+| Observability | CloudWatch custom metrics + admin dashboard |
 
 ---
 
@@ -45,17 +45,14 @@ uv run ruff format .
 
 # Type check
 uv run mypy .
-
-# Docker build and run
-docker build -t firstcall .
-docker run -p 8000:8000 --env-file .env firstcall
 ```
 
-Environment variables needed in `.env`:
+Environment variables needed in `.env` (see `.env.example`):
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-- `DEEPGRAM_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `ELEVENLABS_API_KEY`
+- `OPENAI_API_KEY`
+- `REDIS_HOST`, `REDIS_SSL`
+- `ADMIN_USER`, `ADMIN_PASSWORD`
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (production only)
 
 ---
 
@@ -64,26 +61,30 @@ Environment variables needed in `.env`:
 ```
 Twilio webhook (incoming call)
     ↓
-FastAPI backend (AWS EC2)
+POST /voice → FastAPI returns TwiML (opens WebSocket stream)
     ↓
-Deepgram streaming STT  (<300ms latency target)
+WebSocket /stream ←→ Twilio Media Streams
+    |
+    ├── twilio_to_openai(): forwards g711 audio chunks to OpenAI Realtime
+    └── openai_to_twilio(): forwards audio back, handles events
+            |
+            ├── response.output_audio.delta → audio to caller
+            ├── conversation.item.input_audio_transcription.completed
+            │       → Protocol Agent (gpt-5.4-nano) extracts CallState
+            │       → session.update injects next_instruction to Voice Agent
+            ├── input_audio_buffer.speech_started → barge-in clear
+            └── response.cancelled → barge-in clear
     ↓
-Codex agent — triage + guidance loop
-    ├── triage_severity(description) → ROUTINE | URGENT | CRITICAL
-    ├── get_emergency_number(country) → 911 / 999 / 112
-    ├── get_first_aid_protocol(condition) → step-by-step instructions
-    └── adapt_instructions(feedback) → simplify / repeat / next step
+Call ends (stop event)
     ↓
-Severity gate (HITL escalation logic)
+Summary Agent (gpt-5.4-nano) generates CallSummary
     ↓
-ElevenLabs TTS → Twilio → caller hears voice  (<500ms to first word)
+Session saved to Redis (with avg latency + TTFT)
     ↓
-Stateful multi-turn conversation
-    ↓
-Audit log: timestamp | triage tier | condition | duration (no PII)
+POST /call-status (Twilio webhook) → write CallLog to SQLite → clear Redis
 ```
 
-**Latency target:** End-to-end speech-in to speech-out < 1.5 seconds. Requires streaming STT + streaming LLM + streaming TTS throughout.
+**Latency target:** End-to-end speech-in to speech-out < 1.5 seconds via OpenAI Realtime (single WebSocket, no STT→LLM→TTS pipeline).
 
 ---
 
@@ -118,7 +119,7 @@ Life-threatening conditions trigger 911 escalation **before** any first aid:
 
 ---
 
-## First Aid Protocols (MVP Top 10)
+## First Aid Protocols (10 covered)
 
 1. Cardiac arrest (CPR)
 2. Choking (adult + child)
@@ -130,16 +131,3 @@ Life-threatening conditions trigger 911 escalation **before** any first aid:
 8. Fracture / suspected broken bone
 9. Head injury
 10. Poisoning / overdose
-
-Each protocol must be written in plain language designed to be spoken aloud and followed under panic. Phase 1 covers the top 5 (cardiac arrest, choking, bleeding, stroke, burns).
-
----
-
-## Build Phases
-
-**Phase 1 (Week 1 — Voice Loop MVP):** Twilio webhook → FastAPI → Deepgram STT → Codex triage → Twilio TTS. Top 5 protocols. Tier 3 escalation fires correctly. Audit log in place.
-- Milestone: Call the number, describe a cardiac arrest, hear correct response in < 2 seconds.
-
-**Phase 2 (Week 2 — Full Agent):** All 10 protocols, multi-turn conversation, `adapt_instructions()` tool, ElevenLabs TTS, all 3 tiers, country detection for emergency numbers.
-
-**Phase 3 (Week 3+ — Polish):** Landing page, web demo, multilingual support (Deepgram 30+ languages), post-call SMS summary, metrics dashboard.
