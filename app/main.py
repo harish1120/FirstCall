@@ -478,6 +478,7 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)):  # noq
     valid_pass = secrets.compare_digest(credentials.password, os.getenv("ADMIN_PASSWORD", ""))
     if not (valid_user and valid_pass):
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
+    return credentials
 
 
 @app.get("/admin/calls")
