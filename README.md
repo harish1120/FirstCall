@@ -106,7 +106,7 @@ The 911 escalation logic is the most critical part of the system. It is **not an
 - **Country detection** — Auto-detects caller's country and uses the correct emergency number (911 / 999 / 112 / 000).
 - **Observability** — Structured JSON logging, custom CloudWatch metrics (call volume, latency, TTFT, severity breakdown, 911 escalation rate).
 - **Admin dashboard** — Password-protected `/admin` with CloudWatch latency/TTFT graph + live call feed showing AI summaries, per-call latency, and severity.
-- **Audit log** — Every call logged with severity, condition, duration, steps completed, and whether 911 was recommended. No PII stored.
+- **Audit log** — Every call logged with severity, condition, duration, steps completed, whether 911 was recommended, avg response latency, and avg TTFT. No PII stored.
 
 ---
 
@@ -154,6 +154,11 @@ Summary Agent (gpt-5.4-nano) generates CallSummary
 Full session saved to Redis (with avg latency + TTFT)
         ↓
 POST /call-status (Twilio webhook) → write CallLog to SQLite → clear Redis
+        ↓
+GET /admin       (Basic Auth) → hybrid dashboard
+        ├── CloudWatch PNG (latency + TTFT, last 24h) embedded server-side
+        └── Layout C: sidebar stats + scrollable call feed (30s auto-refresh)
+GET /admin/calls (Basic Auth) → last 50 CallLog rows as JSON
 ```
 
 ---
