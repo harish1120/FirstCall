@@ -23,12 +23,14 @@ jobs:
           TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
           ADMIN_USER: ${{ secrets.ADMIN_USER }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         with:
           host: 34.231.90.192
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 120s
-          envs: OPENAI_API_KEY,TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,TWILIO_PHONE_NUMBER,ADMIN_USER,ADMIN_PASSWORD
+          envs: OPENAI_API_KEY,TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,TWILIO_PHONE_NUMBER,ADMIN_USER,ADMIN_PASSWORD,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
           script: |
             set -e
 
@@ -38,7 +40,7 @@ jobs:
 
             # Write .env — envs are passed as real env vars so special chars are safe
             {
-              echo "APP_ENV=development"
+              echo "APP_ENV=production"
               echo "BASE_URL=https://firstcall.help"
               echo "REDIS_HOST=localhost"
               echo "REDIS_SSL=false"
@@ -48,6 +50,9 @@ jobs:
               echo "TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}"
               echo "ADMIN_USER=${ADMIN_USER}"
               echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
+              echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
+              echo "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
+              echo "AWS_REGION=us-east-1"
             } > /home/ubuntu/app/.env
 
             # Sync any new dependencies
@@ -57,6 +62,9 @@ jobs:
             sudo cp /home/ubuntu/app/index.html /var/www/html/index.html
             sudo cp -r /home/ubuntu/app/static/ /var/www/html/static/
             sudo chown -R www-data:www-data /var/www/html/
+
+            # Reset DB so new schema columns are created fresh on startup
+            rm -f /home/ubuntu/app/firstcall.db
 
             # Restart app
             sudo systemctl restart firstcall
