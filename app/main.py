@@ -442,6 +442,35 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)):  # noq
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
 
 
+@app.get("/admin/calls")
+async def admin_calls(
+    credentials: HTTPBasicCredentials = Depends(require_admin),  # noqa: B008
+    db=Depends(get_db),  # noqa: B008
+):
+    rows = (
+        db.query(models.CallLog)
+        .order_by(models.CallLog.created_at.desc(), models.CallLog.id.desc())
+        .limit(50)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "call_sid": r.call_sid,
+            "severity": r.severity.value,
+            "condition": r.condition,
+            "duration_seconds": r.duration_seconds,
+            "summary": r.summary,
+            "steps_completed": r.steps_completed,
+            "called_911": r.called_911,
+            "avg_latency_ms": r.avg_latency_ms,
+            "avg_ttft_ms": r.avg_ttft_ms,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin(credentials: HTTPBasicCredentials = Depends(require_admin)):  # noqa: B008
     return """                                                                                                                                                                                                              
