@@ -120,6 +120,8 @@ async def call_status(request: Request, db=Depends(get_db)):  # noqa: B008
         summary=session_meta.get("summary"),
         steps_completed=session_meta.get("steps_completed"),
         called_911=session_meta.get("called_911"),
+        avg_latency_ms=session_meta.get("avg_latency_ms"),
+        avg_ttft_ms=session_meta.get("avg_ttft_ms"),
     )
     db.add(call_log)
     db.commit()
@@ -138,6 +140,8 @@ async def stream(
     await websocket.accept()
 
     conversation_history: list[str] = []
+    latency_samples: list[float] = []
+    ttft_samples: list[float] = []
     stream_sid: str | None = None
     call_sid: str | None = None
     country_code: str = "US"
@@ -223,6 +227,16 @@ async def stream(
                                     "steps_completed": last_state.protocol_step,
                                     "key_actions_taken": [],
                                     "called_911": last_state.needs_911,
+                                    "avg_latency_ms": (
+                                        sum(latency_samples) / len(latency_samples)
+                                        if latency_samples
+                                        else None
+                                    ),
+                                    "avg_ttft_ms": (
+                                        sum(ttft_samples) / len(ttft_samples)
+                                        if ttft_samples
+                                        else None
+                                    ),
                                 },
                             )
                         if conversation_history and call_sid:
@@ -243,6 +257,16 @@ async def stream(
                                         "steps_completed": summary.steps_completed,
                                         "key_actions_taken": summary.key_actions_taken,
                                         "called_911": summary.called_911,
+                                        "avg_latency_ms": (
+                                            sum(latency_samples) / len(latency_samples)
+                                            if latency_samples
+                                            else None
+                                        ),
+                                        "avg_ttft_ms": (
+                                            sum(ttft_samples) / len(ttft_samples)
+                                            if ttft_samples
+                                            else None
+                                        ),
                                     },
                                 )
                             except Exception as e:
@@ -278,6 +302,7 @@ async def stream(
                         state = await extract_call_state(t, h, cc, prev)
                         elapsed_ms = (time.monotonic() - t0) * 1000
                         put_metric("TranscriptToResponseMs", elapsed_ms, unit="Milliseconds")
+                        latency_samples.append(elapsed_ms)
                         last_state = state
                         logger.info(
                             "Protocol agent state",
@@ -307,6 +332,7 @@ async def stream(
                         if _response_start is not None:
                             ttft_ms = (time.monotonic() - _response_start) * 1000
                             put_metric("TimeToFirstTokenMs", ttft_ms, unit="Milliseconds")
+                            ttft_samples.append(ttft_ms)
                             logger.info(
                                 "Time to first token",
                                 extra={"ttft_ms": round(ttft_ms), "call_sid": call_sid},
