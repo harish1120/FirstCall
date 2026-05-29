@@ -33,7 +33,6 @@ CRITICAL_KEYWORDS = [
     "turned blue",
     "stopped breathing",
     "heart stopped",
-    "can't breathe",
     "not waking up",
     "collapsed",
 ]
@@ -51,9 +50,7 @@ URGENT_KEYWORDS = [
     "hit by",
     "car accident",
     "accident",
-    "fell",
     "knocked out",
-    "unconscious",
     "trauma",
     "hit by car",
     "knocked unconscious",
